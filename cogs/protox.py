@@ -2,10 +2,13 @@
 cogs/protox.py - Protox.io XP tracking system for the YSL Clan.
 """
 
+import asyncio
 import logging
+from datetime import datetime
+
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import config
 from database import users_col, weekly_snapshots_col
@@ -24,7 +27,11 @@ class ProtoxCog(commands.Cog, name="Protox"):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        logger.info("ProtoxCog loaded.")
+        self.weekly_snapshot_task.start()
+        logger.info("ProtoxCog loaded with automated tasks.")
+
+    def cog_unload(self) -> None:
+        self.weekly_snapshot_task.cancel()
 
     # ============================================================
     # /register
@@ -254,6 +261,53 @@ class ProtoxCog(commands.Cog, name="Protox"):
         await interaction.followup.send(embed=embed)
 
     # ============================================================
+    # Automated Task: Sunday Snapshot
+    # ============================================================
+
+    @tasks.loop(hours=1)
+    async def weekly_snapshot_task(self) -> None:
+        """Takes a snapshot every Sunday at 23:00 UTC."""
+        now = utcnow()
+        # Check if it's Sunday (6) and 23:00 UTC
+        if now.weekday() != 6 or now.hour != 23:
+            return
+
+        week_date = get_week_date_str(now)
+        # Avoid duplicate snapshots for the same week/hour
+        if weekly_snapshots_col.find_one({"week_date": week_date, "type": "auto"}):
+            return
+
+        logger.info(f"Starting automated Sunday snapshot for week {week_date}...")
+        users = list(users_col.find({}))
+        for user in users:
+            pid = user["protox_player_id"]
+            try:
+                xp = await self.bot.protox_client.get_player_xp(pid)
+                weekly_snapshots_col.update_one(
+                    {"player_id": pid, "week_date": week_date},
+                    {
+                        "$set": {
+                            "player_id": pid,
+                            "username": user["username"],
+                            "week_date": week_date,
+                            "total_xp": xp,
+                            "type": "auto",
+                            "created_at": utcnow().isoformat(),
+                        }
+                    },
+                    upsert=True,
+                )
+                await asyncio.sleep(0.5)  # Avoid hitting API rate limits
+            except Exception as e:
+                logger.error(f"Error taking automated snapshot for {pid}: {e}")
+        
+        logger.info("Automated Sunday snapshot completed.")
+
+    @weekly_snapshot_task.before_loop
+    async def before_snapshot(self):
+        await self.bot.wait_until_ready()
+
+    # ============================================================
     # Manual Snapshot (Admin Only)
     # ============================================================
 
@@ -286,7 +340,7 @@ class ProtoxCog(commands.Cog, name="Protox"):
                 upsert=True,
             )
         
-        await interaction.followup.send("✅ Snapshot completed.", ephemeral=True)
+        await interaction.followup.send("✅ Manual snapshot completed.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
