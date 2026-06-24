@@ -15,9 +15,8 @@ from web import start_web_server
 
 logger = logging.getLogger("ysl-bot.main")
 
-# Simplified COGS list
+# Simplified COGS list - Only Protox remaining
 COGS = [
-    "cogs.moderation",
     "cogs.protox",
 ]
 

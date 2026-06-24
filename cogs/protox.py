@@ -2,13 +2,10 @@
 cogs/protox.py - Protox.io XP tracking system for the YSL Clan.
 """
 
-import asyncio
 import logging
-from datetime import datetime
-
 import discord
 from discord import app_commands
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 import config
 from database import users_col, weekly_snapshots_col
@@ -27,11 +24,7 @@ class ProtoxCog(commands.Cog, name="Protox"):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.weekly_snapshot_task.start()
         logger.info("ProtoxCog loaded.")
-
-    def cog_unload(self) -> None:
-        self.weekly_snapshot_task.cancel()
 
     # ============================================================
     # /register
@@ -261,46 +254,8 @@ class ProtoxCog(commands.Cog, name="Protox"):
         await interaction.followup.send(embed=embed)
 
     # ============================================================
-    # Automated Task: Sunday Snapshot
+    # Manual Snapshot (Admin Only)
     # ============================================================
-
-    @tasks.loop(hours=1)
-    async def weekly_snapshot_task(self) -> None:
-        """Takes a snapshot every Sunday at 23:00 UTC."""
-        now = utcnow()
-        if now.weekday() != 6 or now.hour != 23:
-            return
-
-        week_date = get_week_date_str(now)
-        if weekly_snapshots_col.find_one({"week_date": week_date, "type": "auto"}):
-            return
-
-        users = list(users_col.find({}))
-        for user in users:
-            pid = user["protox_player_id"]
-            try:
-                xp = await self.bot.protox_client.get_player_xp(pid)
-                weekly_snapshots_col.update_one(
-                    {"player_id": pid, "week_date": week_date},
-                    {
-                        "$set": {
-                            "player_id": pid,
-                            "username": user["username"],
-                            "week_date": week_date,
-                            "total_xp": xp,
-                            "type": "auto",
-                            "created_at": utcnow().isoformat(),
-                        }
-                    },
-                    upsert=True,
-                )
-                await asyncio.sleep(0.5)
-            except Exception as e:
-                logger.error(f"Error taking snapshot for {pid}: {e}")
-
-    @weekly_snapshot_task.before_loop
-    async def before_snapshot(self):
-        await self.bot.wait_until_ready()
 
     @app_commands.command(name="snapshot", description="[ADMIN] Force a manual XP snapshot")
     @app_commands.default_permissions(administrator=True)
@@ -319,7 +274,15 @@ class ProtoxCog(commands.Cog, name="Protox"):
             xp = await self.bot.protox_client.get_player_xp(pid)
             weekly_snapshots_col.update_one(
                 {"player_id": pid, "week_date": week_date},
-                {"$set": {"player_id": pid, "username": user["username"], "week_date": week_date, "total_xp": xp, "created_at": utcnow().isoformat()}},
+                {
+                    "$set": {
+                        "player_id": pid, 
+                        "username": user["username"], 
+                        "week_date": week_date, 
+                        "total_xp": xp, 
+                        "created_at": utcnow().isoformat()
+                    }
+                },
                 upsert=True,
             )
         
