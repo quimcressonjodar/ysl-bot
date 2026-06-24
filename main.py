@@ -32,7 +32,7 @@ class YSLBot(commands.Bot):
         intents.guilds = True
 
         super().__init__(
-            command_prefix="!",
+            command_prefix="!",  # Text prefix for owner commands
             intents=intents,
             status=discord.Status.online,
             activity=discord.Game(name=f"Protox.io | {config.CLAN_NAME}"),
@@ -61,14 +61,7 @@ class YSLBot(commands.Bot):
     async def on_ready(self) -> None:
         """Called when the bot is connected and ready."""
         logger.info(f"✅ Bot logged in as {self.user} (ID: {self.user.id})")
-        
-        # Synchronize global slash commands
-        logger.info("Synchronizing slash commands...")
-        try:
-            synced = await self.tree.sync()
-            logger.info(f"Successfully synced {len(synced)} global commands.")
-        except Exception as e:
-            logger.error(f"Error syncing commands: {e}")
+        logger.info("Ready to serve. Use !sync to synchronize slash commands.")
 
     async def close(self) -> None:
         await self.protox_client.close()
@@ -87,6 +80,20 @@ def main() -> None:
     )
 
     bot = YSLBot(protox_client=protox_client)
+
+    # Manual sync command for the owner
+    @bot.command(name="sync")
+    @commands.is_owner()
+    async def sync_commands(ctx: commands.Context):
+        """Manually synchronizes slash commands with Discord."""
+        await ctx.send("🔄 Synchronizing global slash commands...")
+        try:
+            synced = await bot.tree.sync()
+            await ctx.send(f"✅ Successfully synced {len(synced)} commands.")
+            logger.info(f"Manual sync: {len(synced)} commands synced by {ctx.author}")
+        except Exception as e:
+            await ctx.send(f"❌ Error syncing commands: {e}")
+            logger.error(f"Manual sync error: {e}")
 
     # Start Flask server in a separate thread
     start_web_server(bot=bot)

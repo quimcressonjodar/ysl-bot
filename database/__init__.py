@@ -1,5 +1,5 @@
 """
-database/__init__.py - Módulo de base de datos del bot YSL.
+database/__init__.py - Database module for the YSL Bot.
 """
 
 from .mongo import (
@@ -8,7 +8,6 @@ from .mongo import (
     guild_settings_col,
     warnings_col,
     events_col,
-    tickets_col,
     ensure_indexes,
 )
 
@@ -18,6 +17,5 @@ __all__ = [
     "guild_settings_col",
     "warnings_col",
     "events_col",
-    "tickets_col",
     "ensure_indexes",
 ]
