@@ -563,25 +563,26 @@ class EconomyCog(commands.Cog):
 
     @commands.hybrid_command(name="claimdrop", description="Claim the active global drop")
     async def claimdrop(self, ctx: commands.Context):
-        if not state.active_global_drop:
+        # Grab and clear the drop atomically (before any await) to prevent race conditions
+        drop = state.active_global_drop
+        if not drop:
             return await ctx.send("❌ No active global drop.")
+        state.active_global_drop = None  # claimed — no one else can take it now
         user_id = str(ctx.author.id)
-        if state.active_global_drop["type"] == "coins":
-            base_reward = state.active_global_drop["reward"]
+        if drop["type"] == "coins":
+            base_reward = drop["reward"]
             reward = apply_amortization(user_id, base_reward)
             eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": reward}}, upsert=True)
-            
             msg = f"🌠 {ctx.author.mention} claimed the drop and received 🪙 {reward:,}!"
             if reward < base_reward:
                 msg += f"\n📉 🪙 {base_reward - reward:,} coins were automatically used to pay your debt."
             await ctx.send(msg)
         else:
-            item = state.active_global_drop["item"]
+            item = drop["item"]
             eco_col.update_one({"_id": user_id}, {"$push": {"inventory": item}}, upsert=True)
             await ctx.send(
                 f"🌠 {ctx.author.mention} claimed:\n\n{item['name']} • {item['rarity'].capitalize()}!"
             )
-        state.active_global_drop = None
 
     @commands.hybrid_command(name="loan", description="Request a loan from the clan bank")
     @app_commands.describe(amount="Amount to borrow (e.g. 1000 or 'max')")

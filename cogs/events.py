@@ -82,7 +82,7 @@ class EventsCog(commands.Cog):
             return
 
         channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
-        state.last_global_drop_time = 0
+        state.last_global_drop_time = time.time()
 
         drop_type = random.choice(["coins", "coins", "coins", "item", "item"])
 
