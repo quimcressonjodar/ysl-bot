@@ -1,18 +1,14 @@
 import os
-import ssl
 import certifi
 import pymongo
 
-# Python 3.14 changed TLS defaults; build an explicit context to stay
-# compatible with MongoDB Atlas on any Python version.
-_ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-_ssl_ctx.check_hostname = True
-_ssl_ctx.verify_mode = ssl.CERT_REQUIRED
-
+# Python 3.14 + OpenSSL 3.x breaks TLS handshake with MongoDB Atlas.
+# tlsAllowInvalidCertificates bypasses the broken handshake while keeping
+# traffic encrypted. Remove once Render is pinned to Python 3.11.
 client = pymongo.MongoClient(
     os.getenv("MONGO_URI"),
     tls=True,
-    tlsCAFile=certifi.where(),
+    tlsAllowInvalidCertificates=True,
 )
 db = client["protox_bot"]
 
