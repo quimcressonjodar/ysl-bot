@@ -4,6 +4,7 @@ flask
 python-dotenv
 tabulate
 pymongo[srv]>=4.10.1
+certifi>=2024.0.0
 dnspython>=2.6.1
 pillow
 openai

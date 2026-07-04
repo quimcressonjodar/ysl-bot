@@ -1,7 +1,8 @@
 import os
+import certifi
 import pymongo
 
-client = pymongo.MongoClient(os.getenv("MONGO_URI"))
+client = pymongo.MongoClient(os.getenv("MONGO_URI"), tlsCAFile=certifi.where())
 db = client["protox_bot"]
 
 pets_col = db["pets"]
