@@ -340,7 +340,19 @@ def add_price_alert(user_id: str, symbol: str, target_price: int) -> int:
 
 
 def get_user_alerts(user_id: str) -> list:
-    return list(stock_alerts_col.find({"user_id": user_id}).sort("seq", 1))
+    alerts = list(stock_alerts_col.find({"user_id": user_id}))
+    # Backfill seq for legacy alerts that were created before the seq field existed
+    used_seqs = {a["seq"] for a in alerts if "seq" in a}
+    next_seq = 1
+    for a in alerts:
+        if "seq" not in a:
+            while next_seq in used_seqs:
+                next_seq += 1
+            stock_alerts_col.update_one({"_id": a["_id"]}, {"$set": {"seq": next_seq}})
+            a["seq"] = next_seq
+            used_seqs.add(next_seq)
+            next_seq += 1
+    return sorted(alerts, key=lambda a: a["seq"])
 
 
 def remove_alert_by_seq(user_id: str, seq: int) -> dict | None:
