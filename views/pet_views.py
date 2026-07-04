@@ -90,6 +90,10 @@ async def run_adventure(interaction: discord.Interaction, ctx, selected_pet: dic
             upsert=True,
         )
 
+        # Track bounty progress for ADVENTURER bounty
+        from utils.bounties import track_bounty_progress
+        await track_bounty_progress(ctx.bot, user_id, "ADVENTURER", 1)
+
         await interaction.edit_original_response(content=None, embed=embed, view=None)
         
     except Exception as e:
