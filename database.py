@@ -1,15 +1,7 @@
 import os
-import certifi
 import pymongo
 
-# Python 3.14 + OpenSSL 3.x breaks TLS handshake with MongoDB Atlas.
-# tlsAllowInvalidCertificates bypasses the broken handshake while keeping
-# traffic encrypted. Remove once Render is pinned to Python 3.11.
-client = pymongo.MongoClient(
-    os.getenv("MONGO_URI"),
-    tls=True,
-    tlsAllowInvalidCertificates=True,
-)
+client = pymongo.MongoClient(os.getenv("MONGO_URI"))
 db = client["protox_bot"]
 
 pets_col = db["pets"]
