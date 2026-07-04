@@ -59,7 +59,7 @@ class YSLBot(commands.Bot):
             command_prefix="!",
             intents=intents,
             status=discord.Status.online,
-            activity=discord.Game(name="Moderation & Economy | !help"),
+            activity=discord.Game(name="Grinding for YSL"),
             help_command=None,
         )
 
@@ -91,7 +91,7 @@ class YSLBot(commands.Bot):
         logger.info(f"✅ Bot connected as {self.user}!")
         await self.change_presence(
             status=discord.Status.online,
-            activity=discord.Game(name="Moderation & Economy"),
+            activity=discord.Game(name="Grinding for YSL"),
         )
         print(f"READY: {self.user} | {id(self)}")
 
