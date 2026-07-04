@@ -1,7 +1,10 @@
 import os
 import pymongo
 
-client = pymongo.MongoClient(os.getenv("MONGO_URI"))
+client = pymongo.MongoClient(
+    os.getenv("MONGO_URI"),
+    tlsAllowInvalidCertificates=True,
+)
 db = client["protox_bot"]
 
 pets_col = db["pets"]
