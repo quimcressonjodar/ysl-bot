@@ -120,7 +120,7 @@ STEPS: list[dict] = [
             [
                 ("Command", "`!stocks`"),
                 ("What it does", "Lists all companies, their current price and daily % change."),
-                ("🛒 To buy", "`!sbuy <SYMBOL> <amount>` — e.g. `!sbuy KIRKA 10`"),
+                ("🛒 To buy", "`!sbuy <SYMBOL> <amount>` — e.g. `!sbuy PROTOX 10`"),
                 ("💼 Your holdings", "`!portfolio` — see your positions and total profit/loss."),
                 ("⏳ Waiting…", "Type `!stocks` in the server to take a look!"),
             ],

@@ -4,17 +4,17 @@
 The project is a Discord bot built with `discord.py`, following a modular Cog-based architecture.
 
 - **`.\main.py`**: Entry point. Initializes the `WeeklyXPBot`, loads extensions (Cogs), and starts a Flask server in a background thread for keep-alive functionality.
-- **`.\cogs\`**: Contains feature-specific modules (e.g., `admin`, `economy`, `pets`, `kirka`). Each file defines a `commands.Cog` class.
+- **`.\cogs\`**: Contains feature-specific modules (e.g., `admin`, `economy`, `pets`, `protox`). Each file defines a `commands.Cog` class.
 - **`.\utils\`**: Shared utility functions and API clients.
     - `.\utils\economy.py`: Core database operations for the currency system.
-    - `.\utils\kirka_api.py`: `ClanClient` for interacting with the Kirka.io API.
+    - `.\utils\protox_api.py`: `ClanClient` for interacting with the Protox.io API.
     - `.\utils\helpers.py`: Common helpers (e.g., permission checks, duration parsing).
 - **`.\views\`**: Discord UI components (Buttons, Select menus) used for interactive messages.
 - **`.\config.py`**: Centralized configuration, constants (e.g., loot tables, shop prices), and environment variable management.
 - **`.\database.py`**: MongoDB connection setup using `pymongo`.
 
 ## Build, Test, and Development Commands
-The project uses standard Python tools. Ensure a `.env` file is present with `DISCORD_TOKEN` and `KIRKA_API_KEY`.
+The project uses standard Python tools. Ensure a `.env` file is present with `DISCORD_TOKEN` and `PROTOX_API_KEY`.
 
 - **Install dependencies**: `pip install -r requirements.txt`
 - **Run the bot**: `python main.py`

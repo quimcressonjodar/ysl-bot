@@ -7,9 +7,9 @@ import config
 from config import CLAN_NAME, MONDAY_SNAPSHOT_PATH, SUNDAY_SNAPSHOT_PATH
 from database import snaps_col
 from utils.helpers import is_admin, load_snapshot, save_snapshot
-from utils.kirka_api import extract_member_map, build_weekly_rows
+from utils.protox_api import extract_member_map, build_weekly_rows
 
-class KirkaCog(commands.Cog):
+class ProtoxCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
@@ -143,4 +143,4 @@ class KirkaCog(commands.Cog):
             await ctx.send(f"Failed deleting snapshots: {exc}")
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(KirkaCog(bot))
+    await bot.add_cog(ProtoxCog(bot))

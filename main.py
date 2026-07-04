@@ -7,8 +7,8 @@ from flask import Flask
 from threading import Thread
 
 import config
-from config import DISCORD_TOKEN, KIRKA_API_KEY, KIRKA_API_BASE
-from utils.kirka_api import ClanClient
+from config import DISCORD_TOKEN, PROTOX_API_KEY, PROTOX_API_BASE
+from utils.protox_api import ClanClient
 
 logger = logging.getLogger("weekly-xp-bot")
 
@@ -42,7 +42,7 @@ COGS = [
     "cogs.economy",
     "cogs.pets",
     "cogs.games",
-    "cogs.kirka",
+    "cogs.protox",
     "cogs.utility",
     "cogs.events",
     "cogs.fake_admin_ai",
@@ -109,13 +109,13 @@ class WeeklyXPBot(commands.Bot):
 def validate_environment() -> None:
     if not DISCORD_TOKEN:
         raise RuntimeError("Missing required environment variable: DISCORD_TOKEN")
-    if not KIRKA_API_KEY:
-        raise RuntimeError("Missing required environment variable: KIRKA_API_KEY")
+    if not PROTOX_API_KEY:
+        raise RuntimeError("Missing required environment variable: PROTOX_API_KEY")
 
 
 if __name__ == "__main__":
     validate_environment()
     keep_alive()
-    clan_client = ClanClient(api_base=KIRKA_API_BASE, api_key=KIRKA_API_KEY)
+    clan_client = ClanClient(api_base=PROTOX_API_BASE, api_key=PROTOX_API_KEY)
     bot = WeeklyXPBot(clan_client=clan_client)
     bot.run(DISCORD_TOKEN)

@@ -53,14 +53,14 @@ class ClanClient:
             nested = payload.get("clan")
             if isinstance(nested, dict):
                 return nested
-        raise RuntimeError(f"Unexpected Kirka API format. Raw type: {type(payload).__name__}")
+        raise RuntimeError(f"Unexpected Protox API format. Raw type: {type(payload).__name__}")
 
     def _extract_members_list(self, clan_data: dict[str, Any]) -> list[dict[str, Any]]:
         for key in ("members", "clanUsers", "users", "players"):
             members = clan_data.get(key)
             if isinstance(members, list):
                 return members
-        raise RuntimeError("Unexpected Kirka response: members list not found")
+        raise RuntimeError("Unexpected Protox response: members list not found")
 
     async def _request_json_with_retry(
         self, method: str, url: str, json_payload: dict[str, Any] | None = None
@@ -83,11 +83,11 @@ class ClanClient:
                         await asyncio.sleep(delay)
                         continue
                     if response.status >= 500:
-                        raise RuntimeError(f"Kirka temporary error {response.status}: {body[:200]}")
+                        raise RuntimeError(f"Protox temporary error {response.status}: {body[:200]}")
                     if response.status in {401, 403}:
-                        raise RuntimeError("Kirka API rejected the key (401/403). Check KIRKA_API_KEY in .env")
+                        raise RuntimeError("Protox API rejected the key (401/403). Check PROTOX_API_KEY in .env")
                     if response.status < 200 or response.status >= 300:
-                        raise RuntimeError(f"Kirka API error {response.status}: {body[:300]}")
+                        raise RuntimeError(f"Protox API error {response.status}: {body[:300]}")
                     return await response.json(content_type=None)
             except (aiohttp.ClientError, asyncio.TimeoutError, RuntimeError) as exc:
                 last_error = exc

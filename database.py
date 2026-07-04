@@ -2,7 +2,7 @@ import os
 import pymongo
 
 client = pymongo.MongoClient(os.getenv("MONGO_URI"))
-db = client["kirka_bot"]
+db = client["protox_bot"]
 
 pets_col = db["pets"]
 warns_col = db["warns"]

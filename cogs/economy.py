@@ -346,7 +346,7 @@ class EconomyCog(commands.Cog):
             msg = random.choice([
                 "robbed an underground casino", "hacked a billionaire's bank account",
                 "stole a cybernetic sports car", "smuggled rare alien artifacts",
-                "sold counterfeit Kirka skins on the black market",
+                "sold counterfeit Protox skins on the black market",
             ])
             
             desc = f"You {msg} and got away with 🪙 **{base_earnings:,}** coins!"

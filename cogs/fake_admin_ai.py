@@ -21,7 +21,7 @@ Rules:
 
 # 🔌 MongoDB
 mongo_client = MongoClient(os.getenv("MONGO_URI"))
-db = mongo_client["kirka_bot"]
+db = mongo_client["protox_bot"]
 memory_col = db["memory"]
 
 

@@ -65,7 +65,7 @@ def generate_top_clans_image(clans: list[dict], page: int = 0, per_page: int = 1
         name = c.get("name", "Unknown")
         scores = c.get("scores", 0)
         members = c.get("membersCount", 0)
-        is_my_clan = name.lower() == "usasone!"
+        is_my_clan = name.lower() == "ysl!"
 
         if is_my_clan:
             text_color = (255, 215, 0)
