@@ -9,7 +9,7 @@ from datetime import timedelta
 
 import state
 from config import WELCOME_CHANNEL_ID, ADVENTURE_LOOT
-from database import eco_col
+from database import eco_col, bot_state_col
 logger = logging.getLogger("weekly-xp-bot")
 
 
@@ -74,15 +74,30 @@ class EventsCog(commands.Cog):
         )
         await channel.send(embed=embed)
 
-    @tasks.loop(minutes=30) # Check more frequently but only spawn every 5 hours
+    @tasks.loop(hours=6)
     async def spawn_global_drop(self):
-        # Check if 5 hours have passed since the last drop
-        last_drop_time = state.last_global_drop_time if hasattr(state, 'last_global_drop_time') else 0
-        if time.time() - last_drop_time < 18000: # 5 hours in seconds
-            return
+        now = time.time()
+        cutoff = now - 21600  # 6 hours in seconds
+
+        # Atomically claim the drop slot: only succeeds when last_drop_time is stale.
+        # This prevents double-fires on restart and across multiple instances.
+        result = bot_state_col.update_one(
+            {"_id": "global_drop", "last_drop_time": {"$lt": cutoff}},
+            {"$set": {"last_drop_time": now}},
+            upsert=False,
+        )
+        if result.matched_count == 0:
+            # No doc exists yet (very first drop ever) OR too recent — handle first-ever case:
+            insert = bot_state_col.update_one(
+                {"_id": "global_drop"},
+                {"$setOnInsert": {"last_drop_time": now}},
+                upsert=True,
+            )
+            if not insert.upserted_id:
+                return  # Doc existed → too recent, skip
+        state.last_global_drop_time = now
 
         channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
-        state.last_global_drop_time = time.time()
 
         drop_type = random.choice(["coins", "coins", "coins", "item", "item"])
 
@@ -114,16 +129,6 @@ class EventsCog(commands.Cog):
 
             item_name, item_value = random.choice(ADVENTURE_LOOT[rarity])
 
-            if rarity == "godly" and channel:
-                await channel.send("🌌 A GODLY item has appeared!!! THE UNIVERSE TREMBLES!")
-            elif rarity == "legendary" and channel:
-                await channel.send("🌌 A LEGENDARY item has appeared!!!")
-
-            state.active_global_drop = {
-                "type": "item",
-                "item": {"name": item_name, "value": item_value, "rarity": rarity},
-            }
-
             rarity_colors = {
                 "common": 0x95A5A6, "rare": 0x3498DB, "epic": 0x9B59B6, "legendary": 0xF1C40F, "godly": 0xFF00FF,
             }
@@ -135,15 +140,35 @@ class EventsCog(commands.Cog):
             embed.add_field(name="🎁 Item", value=item_name)
             embed.add_field(name="✨ Rarity", value=rarity.capitalize())
 
-        if channel:
+            state.active_global_drop = {
+                "type": "item",
+                "item": {"name": item_name, "value": item_value, "rarity": rarity},
+            }
+
+        if not channel:
+            logger.warning("GLOBAL DROP: channel not found, drop skipped")
+            return
+
+        try:
+            if drop_type == "item" and rarity in ("godly", "legendary"):
+                hype = "🌌 A GODLY item has appeared!!! THE UNIVERSE TREMBLES!" if rarity == "godly" else "🌌 A LEGENDARY item has appeared!!!"
+                await channel.send(hype)
             await channel.send(embed=embed)
+        except Exception as e:
+            logger.error(f"GLOBAL DROP SEND ERROR: {e}")
+            # Restore old timestamp so the next loop iteration can retry
+            bot_state_col.update_one(
+                {"_id": "global_drop"},
+                {"$set": {"last_drop_time": cutoff - 1}},
+            )
+            state.last_global_drop_time = 0
 
     @spawn_global_drop.before_loop
     async def before_spawn_global_drop(self):
         await self.bot.wait_until_ready()
-        # Initialize last_drop_time if it doesn't exist
-        if not hasattr(state, 'last_global_drop_time'):
-            state.last_global_drop_time = 0
+        # Load persisted last drop time from DB so restarts don't trigger an immediate drop
+        doc = bot_state_col.find_one({"_id": "global_drop"})
+        state.last_global_drop_time = doc["last_drop_time"] if doc else 0
 
     @tasks.loop(hours=1)
     async def process_interests(self):

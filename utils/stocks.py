@@ -138,16 +138,23 @@ def update_stock_prices(news_impact=None):
 # ---------------------------------------------------------------------------
 
 def generate_stock_chart(symbol):
-    """Generate a PNG chart for a stock symbol and return as discord.File."""
+    """Generate a PNG chart for a stock symbol (last 24 h only) and return as discord.File."""
     history = stocks_col.find_one({"symbol": symbol})
     if not history or len(history.get("prices", [])) < 2:
         return None
 
-    prices = [p["price"] for p in history["prices"]]
+    # Keep only the last 24 hours of data; fall back to the last 2 points if needed
+    cutoff = time.time() - 86400
+    all_prices = history["prices"]
+    recent = [p for p in all_prices if p["timestamp"] >= cutoff]
+    if len(recent) < 2:
+        recent = all_prices[-2:]
+
     spain_tz = ZoneInfo("Europe/Madrid")
+    prices = [p["price"] for p in recent]
     timestamps = [
         pd.to_datetime(p["timestamp"], unit='s', utc=True).tz_convert(spain_tz)
-        for p in history["prices"]
+        for p in recent
     ]
 
     df = pd.DataFrame({"timestamp": timestamps, "price": prices})
