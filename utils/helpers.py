@@ -3,7 +3,7 @@ from datetime import timedelta
 import discord
 from discord.ext import commands
 
-from database import warns_col, snaps_col
+from database import warns_col
 
 
 def is_admin(ctx: commands.Context) -> bool:
@@ -33,12 +33,3 @@ def load_warns() -> dict:
 
 def save_warns(data: dict) -> None:
     warns_col.update_one({"_id": "all_warns"}, {"$set": {"data": data}}, upsert=True)
-
-
-def load_snapshot(path) -> dict | None:
-    doc = snaps_col.find_one({"_id": str(path)})
-    return doc["data"] if doc else None
-
-
-def save_snapshot(path, data: dict) -> None:
-    snaps_col.update_one({"_id": str(path)}, {"$set": {"data": data}}, upsert=True)

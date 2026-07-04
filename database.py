@@ -6,7 +6,6 @@ db = client["protox_bot"]
 
 pets_col = db["pets"]
 warns_col = db["warns"]
-snaps_col = db["snapshots"]
 eco_col = db["economy"]
 memory_col = db["memory"]
 starboard_col = db["starboard_config"]

@@ -6,9 +6,7 @@ from discord.ext import commands
 from flask import Flask
 from threading import Thread
 
-import config
-from config import DISCORD_TOKEN, KIRKA_API_KEY, KIRKA_API_BASE
-from utils.kirka_api import ClanClient
+from config import DISCORD_TOKEN
 
 logger = logging.getLogger("weekly-xp-bot")
 
@@ -42,7 +40,6 @@ COGS = [
     "cogs.economy",
     "cogs.pets",
     "cogs.games",
-    "cogs.protox",
     "cogs.utility",
     "cogs.events",
     "cogs.fake_admin_ai",
@@ -52,8 +49,8 @@ COGS = [
 ]
 
 
-class WeeklyXPBot(commands.Bot):
-    def __init__(self, clan_client: ClanClient):
+class YSLBot(commands.Bot):
+    def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
         intents.message_content = True
@@ -65,12 +62,9 @@ class WeeklyXPBot(commands.Bot):
             activity=discord.Game(name="Moderation & Economy | !help"),
             help_command=None,
         )
-        self.clan_client = clan_client
 
     async def setup_hook(self) -> None:
         logger.info("Starting setup_hook...")
-        await self.clan_client.start()
-        logger.info("Clan client started")
         for cog in COGS:
             logger.info(f"Loading extension {cog}...")
             await self.load_extension(cog)
@@ -101,21 +95,14 @@ class WeeklyXPBot(commands.Bot):
         )
         print(f"READY: {self.user} | {id(self)}")
 
-    async def close(self) -> None:
-        await self.clan_client.close()
-        await super().close()
-
 
 def validate_environment() -> None:
     if not DISCORD_TOKEN:
         raise RuntimeError("Missing required environment variable: DISCORD_TOKEN")
-    if not KIRKA_API_KEY:
-        raise RuntimeError("Missing required environment variable: KIRKA_API_KEY")
 
 
 if __name__ == "__main__":
     validate_environment()
     keep_alive()
-    clan_client = ClanClient(api_base=KIRKA_API_BASE, api_key=KIRKA_API_KEY)
-    bot = WeeklyXPBot(clan_client=clan_client)
+    bot = YSLBot()
     bot.run(DISCORD_TOKEN)

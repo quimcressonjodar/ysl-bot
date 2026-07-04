@@ -10,12 +10,6 @@ logger = logging.getLogger("weekly-xp-bot")
 DEFAULT_WEEKLY_XP_REQUIREMENT = 30_000
 WEEKLY_XP_REQUIREMENT = int(os.getenv("WEEKLY_XP_REQUIREMENT", str(DEFAULT_WEEKLY_XP_REQUIREMENT)))
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
-KIRKA_API_KEY = os.getenv("KIRKA_API_KEY", "")
-CLAN_NAME = os.getenv("KIRKA_CLAN_TAG", "YSL!")
-KIRKA_API_BASE = os.getenv("KIRKA_API_BASE", "https://api.kirka.io")
-HTTP_TIMEOUT_SECONDS = float(os.getenv("HTTP_TIMEOUT_SECONDS", "20"))
-HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "3"))
-HTTP_RETRY_BASE_DELAY = float(os.getenv("HTTP_RETRY_BASE_DELAY", "0.8"))
 
 WELCOME_CHANNEL_ID = 1206229312743809054
 OWNER_IDS = {1436417791615045785}
@@ -31,8 +25,6 @@ CARD_EMOJIS = {
 }
 CARD_BACK = "🂠"
 
-MONDAY_SNAPSHOT_PATH = "xp_monday.json"
-SUNDAY_SNAPSHOT_PATH = "sunday_snapshot"
 
 PET_LOOT_PROBABILITIES = {
     "slime":    {"common": 90, "rare": 8, "epic": 1.5, "legendary": 0.5},
