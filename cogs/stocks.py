@@ -134,7 +134,7 @@ class Stocks(commands.Cog):
     async def update_stocks(self):
         try:
             news_impact = {}
-            if random.random() < 0.40:
+            if random.random() < 0.50:
                 symbol, message, multiplier = get_random_news()
                 news_impact[symbol] = multiplier
 
