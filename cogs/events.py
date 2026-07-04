@@ -82,7 +82,7 @@ class EventsCog(commands.Cog):
             return
 
         channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
-        state.last_global_drop_time = time.time()
+        state.last_global_drop_time = 0
 
         drop_type = random.choice(["coins", "coins", "coins", "item", "item"])
 
@@ -143,7 +143,7 @@ class EventsCog(commands.Cog):
         await self.bot.wait_until_ready()
         # Initialize last_drop_time if it doesn't exist
         if not hasattr(state, 'last_global_drop_time'):
-            state.last_global_drop_time = time.time()
+            state.last_global_drop_time = 0
 
     @tasks.loop(hours=1)
     async def process_interests(self):
