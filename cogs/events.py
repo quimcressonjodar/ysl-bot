@@ -13,7 +13,7 @@ from database import eco_col, bot_state_col
 logger = logging.getLogger("weekly-xp-bot")
 
 
-GLOBAL_DROP_CHANNEL_ID = 1522956378006749285
+GLOBAL_DROP_CHANNEL_ID = 1513755454029959239
 GLOBAL_DROP_COIN_REWARDS = [50000, 75000, 100000, 125000, 150000, 200000]
 
 

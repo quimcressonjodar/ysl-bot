@@ -138,7 +138,7 @@ class Stocks(commands.Cog):
                 symbol, message, multiplier = get_random_news()
                 news_impact[symbol] = multiplier
 
-                STOCK_NEWS_CHANNEL_ID = 1206197908399980575
+                STOCK_NEWS_CHANNEL_ID = 1513755454029959239
                 channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
                 if channel:
                     embed = discord.Embed(title="🗞️ Market News Alert", description=message, color=0xF1C40F)
@@ -159,7 +159,7 @@ class Stocks(commands.Cog):
         try:
             users, total, rates = process_dividends()
             if users > 0:
-                STOCK_NEWS_CHANNEL_ID = 1206197908399980575
+                STOCK_NEWS_CHANNEL_ID = 1513755454029959239
                 channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
                 if channel:
                     # Sort stocks by dividend rate to show best and worst payers
@@ -517,7 +517,7 @@ class Stocks(commands.Cog):
             )
         embed.set_footer(text="Market news can already affect this company.")
 
-        STOCK_NEWS_CHANNEL_ID = 1206197908399980575
+        STOCK_NEWS_CHANNEL_ID = 1513755454029959239
         channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
         if channel and channel.id != ctx.channel.id:
             await channel.send(embed=embed)
