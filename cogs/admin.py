@@ -411,19 +411,27 @@ class AdminCog(commands.Cog):
         # Patch config.py on disk so IDs survive restarts
         import re, pathlib
         config_path = pathlib.Path(__file__).parent.parent / "config.py"
+        not_patched: list[str] = []
         try:
             text = config_path.read_text()
             for key, role_id in new_ids.items():
-                # Match the line like: "bronze":    {..., "role_id": 1234567890},
-                text = re.sub(
-                    rf'("{key}"\s*:\s*\{{[^}}]*"role_id"\s*:\s*)\d+',
+                # Match the entry anywhere in the dict (handles multi-line formatting)
+                pattern = rf'("{re.escape(key)}"\s*:\s*\{{[^}}]*?"role_id"\s*:\s*)\d+'
+                new_text, n = re.subn(
+                    pattern,
                     lambda m, rid=role_id: m.group(1) + str(rid),
-                    text
+                    text,
+                    flags=re.DOTALL,
                 )
+                if n == 0:
+                    not_patched.append(key)
+                else:
+                    text = new_text
             config_path.write_text(text)
-            patched = True
+            patched = len(not_patched) == 0
         except Exception as e:
             patched = False
+            not_patched = list(new_ids.keys())
             errors.append(f"config.py patch failed: {e}")
 
         lines = []
@@ -436,7 +444,8 @@ class AdminCog(commands.Cog):
         if patched:
             lines.append("💾 `config.py` updated on disk — IDs will persist after restart.")
         else:
-            lines.append("⚠️ Could not patch `config.py` — restart the bot manually after updating.")
+            missed = ", ".join(not_patched) if not_patched else "unknown"
+            lines.append(f"⚠️ `config.py` patch incomplete — these keys were NOT updated: `{missed}`. Update them manually.")
 
         embed = discord.Embed(
             title="🛠️ Shop Roles Setup",
