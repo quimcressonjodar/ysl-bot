@@ -352,5 +352,100 @@ class AdminCog(commands.Cog):
         await ctx.send(embed=embed)
 
 
+    @commands.hybrid_command(name="setuproles", description="Create all shop roles in this server and update their IDs (Admin only)")
+    @app_commands.default_permissions(administrator=True)
+    async def setuproles(self, ctx: commands.Context):
+        if not is_admin(ctx):
+            return await ctx.send("❌ Admin only command.", ephemeral=True)
+
+        await ctx.defer()
+
+        # Role definitions: key matches ROLE_SHOP, display name, color
+        ROLE_DEFS = [
+            ("bronze",   "Bronze",   discord.Color.from_rgb(205, 127, 50)),
+            ("silver",   "Silver",   discord.Color.from_rgb(192, 192, 192)),
+            ("gold",     "Gold",     discord.Color.from_rgb(255, 215, 0)),
+            ("diamond",  "Diamond",  discord.Color.from_rgb(185, 242, 255)),
+            ("emerald",  "Emerald",  discord.Color.from_rgb(80, 200, 120)),
+            ("mythic",   "Mythic",   discord.Color.from_rgb(155, 89, 182)),
+            ("cosmic",   "Cosmic",   discord.Color.from_rgb(26, 26, 255)),
+            ("eternal",  "Eternal",  discord.Color.from_rgb(255, 107, 53)),
+            ("secret",   "Secret",   discord.Color.from_rgb(255, 20, 147)),
+            ("godlike",  "Godlike",  discord.Color.from_rgb(255, 50, 50)),
+            ("celestial","Celestial",discord.Color.from_rgb(230, 230, 255)),
+            ("ascended", "Ascended", discord.Color.from_rgb(255, 255, 0)),
+        ]
+
+        created = []
+        skipped = []
+        errors = []
+
+        # Map existing role names for deduplication
+        existing_roles = {r.name.lower(): r for r in ctx.guild.roles}
+
+        new_ids: dict[str, int] = {}
+
+        for key, display_name, color in ROLE_DEFS:
+            if display_name.lower() in existing_roles:
+                role = existing_roles[display_name.lower()]
+                new_ids[key] = role.id
+                skipped.append(f"**{display_name}** — already exists → `{role.id}`")
+            else:
+                try:
+                    role = await ctx.guild.create_role(
+                        name=display_name,
+                        color=color,
+                        mentionable=False,
+                        reason="setuproles command"
+                    )
+                    new_ids[key] = role.id
+                    created.append(f"**{display_name}** → `{role.id}`")
+                except Exception as e:
+                    errors.append(f"**{display_name}**: {e}")
+
+        # Update ROLE_SHOP in memory
+        for key, role_id in new_ids.items():
+            if key in ROLE_SHOP:
+                ROLE_SHOP[key]["role_id"] = role_id
+
+        # Patch config.py on disk so IDs survive restarts
+        import re, pathlib
+        config_path = pathlib.Path(__file__).parent.parent / "config.py"
+        try:
+            text = config_path.read_text()
+            for key, role_id in new_ids.items():
+                # Match the line like: "bronze":    {..., "role_id": 1234567890},
+                text = re.sub(
+                    rf'("{key}"\s*:\s*\{{[^}}]*"role_id"\s*:\s*)\d+',
+                    lambda m, rid=role_id: m.group(1) + str(rid),
+                    text
+                )
+            config_path.write_text(text)
+            patched = True
+        except Exception as e:
+            patched = False
+            errors.append(f"config.py patch failed: {e}")
+
+        lines = []
+        if created:
+            lines.append("✅ **Created:**\n" + "\n".join(created))
+        if skipped:
+            lines.append("⏭️ **Already existed:**\n" + "\n".join(skipped))
+        if errors:
+            lines.append("❌ **Errors:**\n" + "\n".join(errors))
+        if patched:
+            lines.append("💾 `config.py` updated on disk — IDs will persist after restart.")
+        else:
+            lines.append("⚠️ Could not patch `config.py` — restart the bot manually after updating.")
+
+        embed = discord.Embed(
+            title="🛠️ Shop Roles Setup",
+            description="\n\n".join(lines),
+            color=0x00FF88,
+            timestamp=datetime.now(timezone.utc)
+        )
+        await ctx.send(embed=embed)
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(AdminCog(bot))
