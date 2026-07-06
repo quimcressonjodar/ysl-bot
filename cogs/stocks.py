@@ -197,13 +197,40 @@ class Stocks(commands.Cog):
         await self.bot.wait_until_ready()
         # Load any persisted IPO stocks into the live STOCKS dict
         load_ipo_stocks()
-        # Ensure at least two data points for charts on first run
+        # Ensure every stock has at least 2 data points so charts render.
+        # We seed each stock individually rather than calling update_stock_prices()
+        # once (which only adds 1 point and breaks on the first stock found).
         from utils.stocks import stocks_col
+        import time as _time
+        needs_seed = []
         for symbol in STOCKS:
             history = stocks_col.find_one({"symbol": symbol})
             if not history or len(history.get("prices", [])) < 2:
-                update_stock_prices()
-                break
+                needs_seed.append(symbol)
+
+        for symbol in needs_seed:
+            initial_price = STOCKS[symbol].get("initial_price", 500)
+            history = stocks_col.find_one({"symbol": symbol})
+            existing = history.get("prices", []) if history else []
+            # Build a list with at least 2 points
+            if len(existing) == 0:
+                seed = [
+                    {"price": initial_price, "timestamp": _time.time() - 120},
+                    {"price": initial_price, "timestamp": _time.time() - 60},
+                ]
+            else:
+                # Has exactly 1 point — add a second one right before it
+                seed = [
+                    {"price": existing[0]["price"], "timestamp": existing[0]["timestamp"] - 60},
+                ] + existing
+            if history:
+                stocks_col.update_one({"symbol": symbol}, {"$set": {"prices": seed}})
+            else:
+                stocks_col.insert_one({"symbol": symbol, "prices": seed})
+
+        # Run one full price update so all stocks get a fresh tick
+        if needs_seed:
+            update_stock_prices()
 
     # ------------------------------------------------------------------
     # Trading commands
