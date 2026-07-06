@@ -6,10 +6,10 @@ from discord.ext import commands
 from database import warns_col
 
 
+OWNER_ID = 1436417791615045785
+
 def is_admin(ctx: commands.Context) -> bool:
-    if isinstance(ctx.author, discord.Member):
-        return bool(ctx.author.guild_permissions.administrator)
-    return False
+    return ctx.author.id == OWNER_ID
 
 
 def parse_duration(duration_str: str) -> timedelta | None:

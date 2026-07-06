@@ -10,7 +10,7 @@ from utils.stocks import (
     load_ipo_stocks, add_ipo_stock,
     add_price_alert, get_user_alerts, remove_alert_by_seq, check_price_alerts,
     add_autosell, get_user_autosells, remove_autosell_by_seq, check_autosells,
-    stock_alerts_col,
+    stock_alerts_col, user_stocks_col,
 )
 from utils.stock_news import get_random_news
 from utils.economy import get_wallet, update_wallet, get_bank, get_prestige_level
@@ -627,8 +627,77 @@ class Stocks(commands.Cog):
         symbol = random.choice(available)
         data = self.IPO_POOL[symbol]
 
+        # ── Pre-compute which stock will be delisted and its last price ──────
+        worst_symbol = None
+        worst_performance = float("inf")
+        for s in list(STOCKS.keys()):
+            try:
+                price = get_current_price(s)
+            except Exception:
+                price = STOCKS[s]["initial_price"]
+            initial = STOCKS[s].get("initial_price", 500)
+            performance = (price - initial) / initial if initial else 0
+            if performance < worst_performance:
+                worst_performance = performance
+                worst_symbol = s
+
+        # Grab last price and all holders BEFORE the stock is removed
+        delisted_price = 0
+        holders = []  # list of (user_id, quantity)
+        if worst_symbol:
+            try:
+                delisted_price = get_current_price(worst_symbol)
+            except Exception:
+                delisted_price = STOCKS[worst_symbol].get("initial_price", 0)
+
+            for doc in user_stocks_col.find({f"stocks.{worst_symbol}": {"$exists": True}}):
+                qty = doc.get("stocks", {}).get(worst_symbol, {}).get("quantity", 0)
+                if qty > 0:
+                    holders.append((doc["_id"], qty))
+
+        # ── Execute the IPO / delisting ───────────────────────────────────────
         removed = add_ipo_stock(symbol, data)
 
+        # ── Pay out and clean up delisted holders ─────────────────────────────
+        paid_out = 0
+        if removed and holders:
+            from utils.economy import update_wallet
+            for user_id, qty in holders:
+                payout = delisted_price * qty
+                if payout > 0:
+                    update_wallet(user_id, payout)
+                    paid_out += 1
+                # Remove the delisted stock from the user's portfolio
+                user_stocks_col.update_one(
+                    {"_id": user_id},
+                    {"$unset": {f"stocks.{removed}": ""}},
+                )
+                # DM the user
+                try:
+                    user = await self.bot.fetch_user(int(user_id))
+                    dm_embed = discord.Embed(
+                        title="📉 Your stock has been delisted",
+                        description=(
+                            f"**{removed}** was the worst-performing company on the market "
+                            f"and has been removed following a new IPO.\n\n"
+                            f"Your **{qty}** share(s) have been automatically liquidated "
+                            f"at the last known price of 🪙 **{delisted_price:,}** per share.\n\n"
+                            f"💰 You received: 🪙 **{delisted_price * qty:,}**"
+                        ),
+                        color=0xE74C3C,
+                    )
+                    dm_embed.set_footer(text="Funds have been added to your wallet.")
+                    await user.send(embed=dm_embed)
+                except Exception:
+                    pass  # DMs closed or user not found
+
+        # ── Also cancel any alerts / autosells for the delisted stock ─────────
+        if removed:
+            stock_alerts_col.delete_many({"symbol": removed})
+            from utils.stocks import autosell_col
+            autosell_col.delete_many({"symbol": removed})
+
+        # ── Announce ──────────────────────────────────────────────────────────
         embed = discord.Embed(title="🏦 New company listed on the market!", color=0xF1C40F)
         embed.add_field(name="🆕 New listing", value=f"**{symbol}** — {data['name']}", inline=False)
         embed.add_field(name="🏭 Sector", value=data["sector"], inline=True)
@@ -636,9 +705,10 @@ class Stocks(commands.Cog):
         embed.add_field(name="📊 Volatility", value=f"{data['volatility']:.0%}", inline=True)
         embed.add_field(name="📝 About", value=data["description"], inline=False)
         if removed:
+            holder_note = f"\n👥 {paid_out} holder(s) were automatically paid out and notified." if holders else ""
             embed.add_field(
                 name="📉 Delisted (worst performer)",
-                value=f"**{removed}** has been removed from the market.",
+                value=f"**{removed}** has been removed from the market.{holder_note}",
                 inline=False,
             )
         embed.set_footer(text="Market news can already affect this company.")

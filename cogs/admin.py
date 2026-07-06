@@ -267,6 +267,28 @@ class AdminCog(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    @commands.hybrid_command(name="remove", description="Remove coins from a user's wallet (Admin only)")
+    @app_commands.describe(member="The member to remove coins from", amount="Amount of coins to remove")
+    @app_commands.default_permissions(administrator=True)
+    async def remove(self, ctx: commands.Context, member: discord.Member, amount: int):
+        if not is_admin(ctx):
+            return await ctx.send("❌ Admin only command.", ephemeral=True)
+        if amount <= 0:
+            return await ctx.send("❌ Amount must be greater than 0.", ephemeral=True)
+        from utils.economy import update_wallet, get_wallet
+        current = get_wallet(str(member.id))
+        deduct = min(amount, current)
+        update_wallet(str(member.id), -deduct)
+        wallet = get_wallet(str(member.id))
+        embed = discord.Embed(
+            title="💸 Coins Removed",
+            description=f"Removed 🪙 **{deduct:,}** from {member.mention}\n\nNew Wallet Balance: 🪙 **{wallet:,}**",
+            color=0xFF4444,
+        )
+        if deduct < amount:
+            embed.set_footer(text=f"Note: user only had {current:,} coins — removed all of them.")
+        await ctx.send(embed=embed)
+
     @commands.hybrid_command(name="reset_economy", description="RESETS EVERYTHING: coins, pets, items, and roles (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def reset_economy(self, ctx: commands.Context):
