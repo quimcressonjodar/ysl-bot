@@ -9,6 +9,7 @@ from utils.stocks import (
     get_user_portfolio, buy_stock, sell_stock, process_dividends,
     load_ipo_stocks, add_ipo_stock,
     add_price_alert, get_user_alerts, remove_alert_by_seq, check_price_alerts,
+    add_autosell, get_user_autosells, remove_autosell_by_seq, check_autosells,
     stock_alerts_col,
 )
 from utils.stock_news import get_random_news
@@ -148,8 +149,9 @@ class Stocks(commands.Cog):
 
             update_stock_prices(news_impact)
 
-            # Check price alerts after every price update
+            # Check price alerts and auto-sell orders after every price update
             await check_price_alerts(self.bot)
+            await check_autosells(self.bot)
 
         except Exception as e:
             print(f"STOCK UPDATE ERROR: {e}")
@@ -450,6 +452,118 @@ class Stocks(commands.Cog):
         embed = discord.Embed(
             title="✅ Alert cancelled",
             description=f"The alert for **{alert['symbol']}** at 🪙 {alert['target_price']:,} has been removed.",
+            color=0x2ECC71,
+        )
+        await ctx.send(embed=embed)
+
+    # ------------------------------------------------------------------
+    # Auto-sell commands
+    # ------------------------------------------------------------------
+
+    @commands.hybrid_command(name="autosell", description="Set an automatic sell order when a stock hits your target price")
+    @app_commands.describe(
+        symbol="Stock symbol (e.g. VRTX)",
+        quantity="Number of shares to sell when the target is reached",
+        target_price="Price (in coins) at which to trigger the sell",
+    )
+    async def autosell(self, ctx: commands.Context, symbol: str, quantity: int, target_price: int):
+        symbol = symbol.upper()
+        if symbol not in STOCKS:
+            return await ctx.send(f"❌ Stock symbol **{symbol}** not found.", ephemeral=True)
+        if quantity <= 0:
+            return await ctx.send("❌ Quantity must be greater than 0.", ephemeral=True)
+        if target_price <= 0:
+            return await ctx.send("❌ Target price must be greater than 0.", ephemeral=True)
+
+        user_id = str(ctx.author.id)
+        portfolio = get_user_portfolio(user_id)
+        owned = portfolio.get(symbol, {}).get("quantity", 0)
+        if owned <= 0:
+            return await ctx.send(f"❌ You don't own any shares of **{symbol}**.", ephemeral=True)
+        if quantity > owned:
+            return await ctx.send(
+                f"❌ You only own **{owned}** shares of {symbol}, but tried to schedule a sell of **{quantity}**.",
+                ephemeral=True,
+            )
+
+        current_price = get_current_price(symbol)
+        if target_price <= current_price:
+            return await ctx.send(
+                f"❌ Target price 🪙 {target_price:,} must be **above** the current price of 🪙 {current_price:,}.\n"
+                f"Use `!ssell` to sell immediately at the market price.",
+                ephemeral=True,
+            )
+
+        existing = get_user_autosells(user_id)
+        if len(existing) >= 5:
+            return await ctx.send(
+                "❌ You already have 5 active auto-sell orders (max). Cancel one with `!cancelautosell` first.",
+                ephemeral=True,
+            )
+
+        order_id = add_autosell(user_id, symbol, quantity, target_price)
+
+        embed = discord.Embed(
+            title="📤 Auto-sell order set",
+            description=(
+                f"📈 I'll automatically sell **{quantity}x {symbol}** when the price reaches 🪙 **{target_price:,}**\n\n"
+                f"💹 Current price: 🪙 **{current_price:,}**\n"
+                f"🎯 Target price: 🪙 **{target_price:,}** (+{((target_price - current_price) / current_price * 100):.1f}%)"
+            ),
+            color=0x3498DB,
+        )
+        embed.set_footer(text=f"ID: {order_id} • Cancel with: !cancelautosell {order_id}")
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="myautosells", description="View your active auto-sell orders")
+    async def myautosells(self, ctx: commands.Context):
+        user_id = str(ctx.author.id)
+        orders = get_user_autosells(user_id)
+
+        if not orders:
+            return await ctx.send(
+                "📭 You have no active auto-sell orders. Create one with `!autosell <symbol> <quantity> <target_price>`."
+            )
+
+        embed = discord.Embed(title="📤 Your active auto-sell orders", color=0x3498DB)
+        for o in orders:
+            symbol = o["symbol"]
+            try:
+                current = get_current_price(symbol)
+                pct = ((o["target_price"] - current) / current) * 100
+                current_text = f"Current: 🪙 {current:,} ({pct:+.1f}% to target)"
+            except Exception:
+                current_text = "Current price: unknown"
+            embed.add_field(
+                name=f"📈 {symbol} — {o['quantity']} shares @ 🪙 {o['target_price']:,}",
+                value=f"{current_text}\n`!cancelautosell {o['seq']}`",
+                inline=False,
+            )
+
+        embed.set_footer(text="Use !cancelautosell <id> to remove an order")
+        await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="cancelautosell", description="Cancel an active auto-sell order")
+    @app_commands.describe(order_id="Order number shown in !myautosells (e.g. 1, 2, 3)")
+    async def cancelautosell(self, ctx: commands.Context, order_id: str):
+        user_id = str(ctx.author.id)
+        try:
+            seq = int(order_id)
+        except ValueError:
+            return await ctx.send(
+                "❌ Invalid ID — use the number shown in `!myautosells` (e.g. `!cancelautosell 1`).", ephemeral=True
+            )
+
+        order = remove_autosell_by_seq(user_id, seq)
+        if not order:
+            return await ctx.send("❌ Order not found. Check your IDs with `!myautosells`.", ephemeral=True)
+
+        embed = discord.Embed(
+            title="✅ Auto-sell order cancelled",
+            description=(
+                f"The auto-sell order for **{order['quantity']}x {order['symbol']}** "
+                f"at 🪙 {order['target_price']:,} has been removed."
+            ),
             color=0x2ECC71,
         )
         await ctx.send(embed=embed)

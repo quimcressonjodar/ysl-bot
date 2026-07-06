@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import pandas as pd
 import io
 import discord
-from config import STOCKS, STOCK_HISTORY_LIMIT
+from config import STOCKS, STOCK_HISTORY_LIMIT, STOCK_FEE
 from pymongo import MongoClient
 
 # MongoDB setup
@@ -20,6 +20,7 @@ db = client.get_database("test")
 stocks_col = db["stocks_history"]
 user_stocks_col = db["user_stocks"]
 stock_alerts_col = db["stock_alerts"]
+autosell_col = db["stock_autosells"]
 ipo_col = db["ipo_stocks"]
 
 
@@ -404,3 +405,128 @@ async def check_price_alerts(bot):
             pass  # DMs closed or user not found
 
         stock_alerts_col.delete_one({"_id": alert["_id"]})
+
+
+# ---------------------------------------------------------------------------
+# Auto-Sell Order System
+# ---------------------------------------------------------------------------
+
+def add_autosell(user_id: str, symbol: str, quantity: int, target_price: int) -> int:
+    """
+    Save an auto-sell order. Fires when price >= target_price.
+    Returns the short sequential ID scoped to this user.
+    """
+    existing = list(autosell_col.find({"user_id": user_id}, {"seq": 1}))
+    used_seqs = [a.get("seq", 0) for a in existing]
+    seq = 1
+    while seq in used_seqs:
+        seq += 1
+    autosell_col.insert_one({
+        "user_id": user_id,
+        "seq": seq,
+        "symbol": symbol,
+        "quantity": quantity,
+        "target_price": target_price,
+        "created_at": time.time(),
+    })
+    return seq
+
+
+def get_user_autosells(user_id: str) -> list:
+    orders = list(autosell_col.find({"user_id": user_id}))
+    return sorted(orders, key=lambda a: a["seq"])
+
+
+def remove_autosell_by_seq(user_id: str, seq: int) -> dict | None:
+    """Delete auto-sell order by short ID. Returns the doc if found, else None."""
+    order = autosell_col.find_one({"user_id": user_id, "seq": seq})
+    if order:
+        autosell_col.delete_one({"_id": order["_id"]})
+    return order
+
+
+async def check_autosells(bot):
+    """
+    Called after every stock price update.
+    Executes pending auto-sell orders whose target price has been reached,
+    credits the user's wallet, and sends a DM confirmation.
+    """
+    from utils.economy import update_wallet, get_wallet, get_bank, get_prestige_level
+
+    orders = list(autosell_col.find())
+    for order in orders:
+        symbol = order["symbol"]
+        if symbol not in STOCKS:
+            continue
+        try:
+            current_price = get_current_price(symbol)
+        except Exception:
+            continue
+
+        if current_price < order["target_price"]:
+            continue
+
+        # Price has reached the target — execute the sell
+        user_id = order["user_id"]
+        quantity = order["quantity"]
+
+        portfolio = get_user_portfolio(user_id)
+        owned = portfolio.get(symbol, {}).get("quantity", 0)
+        avg_price = portfolio.get(symbol, {}).get("avg_price", 0)
+
+        sell_qty = min(quantity, owned)
+        if sell_qty <= 0:
+            # User no longer holds shares — remove the stale order silently
+            autosell_col.delete_one({"_id": order["_id"]})
+            continue
+
+        # Apply same fee logic as manual sells
+        wallet = get_wallet(user_id)
+        bank = get_bank(user_id)
+        level = get_prestige_level(wallet + bank)
+        fee_multiplier = max(0, 1 - (level * 0.15))
+        current_fee = STOCK_FEE * fee_multiplier
+
+        total_gain = int(current_price * sell_qty * (1 - current_fee))
+        profit = int((current_price - avg_price) * sell_qty)
+        fee_paid = int(current_price * sell_qty * current_fee)
+
+        sold = sell_stock(user_id, symbol, sell_qty)
+        if sold:
+            update_wallet(user_id, total_gain)
+
+            try:
+                user = await bot.fetch_user(int(user_id))
+
+                if profit > 0:
+                    result_line = f"📈 **+🪙 {profit:,}** profit"
+                    color = 0x2ECC71
+                    title = "✅ Auto-sell executed — Profit"
+                elif profit < 0:
+                    result_line = f"📉 **-🪙 {abs(profit):,}** loss"
+                    color = 0xE74C3C
+                    title = "✅ Auto-sell executed — Loss"
+                else:
+                    result_line = "➡️ Break even"
+                    color = 0x95A5A6
+                    title = "✅ Auto-sell executed"
+
+                embed = discord.Embed(title=title, color=color)
+                embed.add_field(name="📦 Shares sold", value=f"**{sell_qty}x {symbol}**", inline=True)
+                embed.add_field(name="💰 Received", value=f"🪙 {total_gain:,}", inline=True)
+                embed.add_field(
+                    name="📊 Sale vs avg buy price",
+                    value=f"🪙 {current_price:,} → avg 🪙 {int(avg_price):,}",
+                    inline=False,
+                )
+                embed.add_field(name="📈 Result", value=result_line, inline=False)
+                footer = f"Target: 🪙 {order['target_price']:,}"
+                if fee_paid > 0:
+                    footer += f" • Fee applied: 🪙 {fee_paid:,}"
+                embed.set_footer(text=footer)
+                await user.send(embed=embed)
+            except Exception:
+                pass  # DMs closed or user not found
+
+            # Only remove the order after a confirmed successful sell
+            autosell_col.delete_one({"_id": order["_id"]})
