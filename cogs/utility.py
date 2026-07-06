@@ -208,6 +208,9 @@ REFERENCE_EMBED = _e(
             "`!alert <SYMBOL> <price>` — DM alert when a stock hits your target\n"
             "`!myalerts` — see your active alerts (shows ID 1, 2, 3…)\n"
             "`!cancelalert <id>` — remove an alert by its short number\n"
+            "`!autosell <SYMBOL> <quantity> <target>` — auto-sell shares when price reaches target\n"
+            "`!myautosells` — see your pending auto-sell orders\n"
+            "`!cancelautosell <id>` — cancel an auto-sell order\n"
             "📅 Dividends paid daily: 0.05%–2% depending on company performance",
         ),
         (
