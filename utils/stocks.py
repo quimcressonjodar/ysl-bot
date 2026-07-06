@@ -16,7 +16,7 @@ from pymongo import MongoClient
 # MongoDB setup
 MONGO_URI = os.getenv("MONGO_URI")
 client = MongoClient(MONGO_URI)
-db = client.get_database("test")
+db = client["protox_bot"]
 stocks_col = db["stocks_history"]
 user_stocks_col = db["user_stocks"]
 stock_alerts_col = db["stock_alerts"]
