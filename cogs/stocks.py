@@ -463,15 +463,13 @@ class Stocks(commands.Cog):
     @commands.hybrid_command(name="autosell", description="Set an automatic sell order when a stock hits your target price")
     @app_commands.describe(
         symbol="Stock symbol (e.g. VRTX)",
-        quantity="Number of shares to sell when the target is reached",
+        quantity="Shares to sell: a number, 'all', or 'half'",
         target_price="Price (in coins) at which to trigger the sell",
     )
-    async def autosell(self, ctx: commands.Context, symbol: str, quantity: int, target_price: int):
+    async def autosell(self, ctx: commands.Context, symbol: str, quantity: str, target_price: int):
         symbol = symbol.upper()
         if symbol not in STOCKS:
             return await ctx.send(f"❌ Stock symbol **{symbol}** not found.", ephemeral=True)
-        if quantity <= 0:
-            return await ctx.send("❌ Quantity must be greater than 0.", ephemeral=True)
         if target_price <= 0:
             return await ctx.send("❌ Target price must be greater than 0.", ephemeral=True)
 
@@ -480,9 +478,23 @@ class Stocks(commands.Cog):
         owned = portfolio.get(symbol, {}).get("quantity", 0)
         if owned <= 0:
             return await ctx.send(f"❌ You don't own any shares of **{symbol}**.", ephemeral=True)
-        if quantity > owned:
+
+        q_lower = quantity.lower().strip()
+        if q_lower in ("all", "max"):
+            parsed_quantity = owned
+        elif q_lower == "half":
+            parsed_quantity = max(1, owned // 2)
+        else:
+            try:
+                parsed_quantity = int(quantity.replace(",", ""))
+            except ValueError:
+                return await ctx.send("❌ Invalid quantity. Use a number, **all**, or **half**.", ephemeral=True)
+
+        if parsed_quantity <= 0:
+            return await ctx.send("❌ Quantity must be greater than 0.", ephemeral=True)
+        if parsed_quantity > owned:
             return await ctx.send(
-                f"❌ You only own **{owned}** shares of {symbol}, but tried to schedule a sell of **{quantity}**.",
+                f"❌ You only own **{owned}** shares of {symbol}, but tried to schedule a sell of **{parsed_quantity}**.",
                 ephemeral=True,
             )
 
@@ -501,12 +513,12 @@ class Stocks(commands.Cog):
                 ephemeral=True,
             )
 
-        order_id = add_autosell(user_id, symbol, quantity, target_price)
+        order_id = add_autosell(user_id, symbol, parsed_quantity, target_price)
 
         embed = discord.Embed(
             title="📤 Auto-sell order set",
             description=(
-                f"📈 I'll automatically sell **{quantity}x {symbol}** when the price reaches 🪙 **{target_price:,}**\n\n"
+                f"📈 I'll automatically sell **{parsed_quantity}x {symbol}** when the price reaches 🪙 **{target_price:,}**\n\n"
                 f"💹 Current price: 🪙 **{current_price:,}**\n"
                 f"🎯 Target price: 🪙 **{target_price:,}** (+{((target_price - current_price) / current_price * 100):.1f}%)"
             ),
