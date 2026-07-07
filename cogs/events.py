@@ -133,3 +133,61 @@ class EventsCog(commands.Cog):
     async def before_spawn_global_drop(self):
         await self.bot.wait_until_ready()
 
+      @tasks.loop(hours=1)
+      async def process_interests(self):
+          """
+          Procesa los intereses de los préstamos cada hora.
+          Aplica un 2% de interés diario prorrateado por el tiempo transcurrido.
+          """
+          now = time.time()
+          users_with_loans = eco_col.find({"loan_amount": {"$gt": 0}})
+
+          for user_data in users_with_loans:
+              user_id  = user_data["_id"]
+              last_calc = user_data.get("last_interest_calc", now)
+              time_diff = now - last_calc
+
+              if time_diff >= 3600:
+                  loan_amount = user_data.get("loan_amount", 0)
+                  interest    = int(loan_amount * 0.02 * (time_diff / 86400))
+
+                  if interest > 0:
+                      eco_col.update_one(
+                          {"_id": user_id},
+                          {
+                              "$inc": {"interest_accrued": interest},
+                              "$set": {"last_interest_calc": now},
+                          },
+                      )
+                      logger.info(f"Applied {interest} interest to user {user_id} for {time_diff/3600:.2f} hours")
+                  elif time_diff >= 86400:
+                      eco_col.update_one({"_id": user_id}, {"$set": {"last_interest_calc": now}})
+
+      @process_interests.before_loop
+      async def before_process_interests(self):
+          await self.bot.wait_until_ready()
+
+      @commands.Cog.listener()
+      async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+          if isinstance(error, commands.CommandNotFound):
+              return
+          from utils.economy import JailCheckError
+          if isinstance(error, JailCheckError):
+              return
+
+          logger.error(f"Error in command {ctx.command}: {error}", exc_info=error)
+
+          if isinstance(error, commands.MissingPermissions):
+              await ctx.send("❌ You don't have permission to use this command.", ephemeral=True)
+          elif isinstance(error, commands.BotMissingPermissions):
+              await ctx.send("❌ I don't have permission to do that.", ephemeral=True)
+          elif isinstance(error, commands.CommandOnCooldown):
+              next_ts = int(time.time() + error.retry_after)
+              await ctx.send(f"⏳ This command is on cooldown. Try again <t:{next_ts}:R>.", ephemeral=True)
+          else:
+              await ctx.send(f"❌ An error occurred: {str(error)}", ephemeral=True)
+
+
+    async def setup(bot: commands.Bot):
+      await bot.add_cog(EventsCog(bot))
+    
