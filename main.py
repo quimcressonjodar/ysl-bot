@@ -46,6 +46,7 @@ COGS = [
     "cogs.starboard",
     "cogs.stocks",
     "cogs.bounties",
+    "cogs.business",
 ]
 
 
