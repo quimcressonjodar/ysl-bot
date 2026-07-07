@@ -4,6 +4,7 @@ Completely independent from the stock market system.
 To add a new business type: add a key to BUSINESS_TYPES below.
 """
 import random
+import string
 import time
 from database import db
 
@@ -384,7 +385,8 @@ def buy_business(owner_id: str, btype_key: str, name: str) -> dict:
   if btype_key not in BUSINESS_TYPES:
       return {"error": f"Unknown business type '{btype_key}'."}
   now         = time.time()
-  business_id = f"{owner_id}_{btype_key}_{int(now)}"
+  short_id    = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
+  business_id = f"{btype_key[:3].upper()}-{short_id}"
   doc = {
       "_id":            business_id,
       "owner_id":       owner_id,

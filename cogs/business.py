@@ -308,6 +308,7 @@ class BusinessCog(commands.Cog):
 
   # ── /business collect ─────────────────────────────────
   @business.command(name="collect", description="Collect income from all or one specific business")
+  @commands.cooldown(1, 1800, commands.BucketType.user)
   @app_commands.describe(business_id="Leave blank to collect from ALL your businesses")
   async def business_collect(self, ctx: commands.Context, business_id: str = None):
       user_id = str(ctx.author.id)
@@ -604,6 +605,15 @@ class BusinessCog(commands.Cog):
       embed.set_footer(text="Income accumulates up to 24h. Collect regularly for XP & reputation!")
       await ctx.send(embed=embed)
 
+
+  @business_collect.error
+  async def collect_error(self, ctx: commands.Context, error: Exception):
+      if isinstance(error, commands.CommandOnCooldown):
+          mins = int(error.retry_after // 60)
+          secs = int(error.retry_after % 60)
+          msg  = f"\u23f0 Ya cobraste hace poco! Inténtalo en **{mins}m {secs}s**." if mins else f"\u23f0 Inténtalo en **{secs}s**."
+          return await ctx.send(msg, ephemeral=True)
+      raise error
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(BusinessCog(bot))
