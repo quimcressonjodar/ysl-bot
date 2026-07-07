@@ -158,6 +158,73 @@ class HireConfirmView(discord.ui.View):
 # COG
 # ─────────────────────────────────────────────────────────
 
+    class VisitView(discord.ui.View):
+    """Select-based view to pick which business to visit and pay entry."""
+
+    def __init__(self, ctx: commands.Context, owner: discord.Member, businesses: list[dict]):
+        super().__init__(timeout=60)
+        self.ctx   = ctx
+        self.owner = owner
+        options    = []
+        for b in businesses[:25]:
+            btype = BUSINESS_TYPES[b["type"]]
+            fee   = btype.get("entry_fee", 0)
+            options.append(discord.SelectOption(
+                label=f'{b["name"][:50]} (Lv.{b["level"]})',
+                description=f'{btype["name"]} • Entry: 🪙 {fee:,}',
+                value=b["_id"],
+                emoji=btype["emoji"],
+            ))
+        self.select.options = options
+
+    @discord.ui.select(placeholder="Choose a business to visit…", min_values=1, max_values=1)
+    async def select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        if str(interaction.user.id) != str(self.ctx.author.id):
+            return await interaction.response.send_message("❌ Not your menu.", ephemeral=True)
+
+        business_id = select.values[0]
+        b    = get_business(business_id)
+        if not b:
+            return await interaction.response.send_message("❌ Business not found.", ephemeral=True)
+
+        btype    = BUSINESS_TYPES[b["type"]]
+        fee      = btype.get("entry_fee", 0)
+        visitor  = str(interaction.user.id)
+        owner_id = b["owner_id"]
+
+        # Can't visit own business through visit command
+        if visitor == owner_id:
+            return await interaction.response.send_message("❌ Ese es tu propio negocio.", ephemeral=True)
+
+        wallet = get_wallet(visitor)
+        if wallet < fee:
+            return await interaction.response.send_message(
+                f"❌ No tienes suficiente dinero. Necesitas 🪙 **{fee:,}** y tienes 🪙 {wallet:,}.",
+                ephemeral=True,
+            )
+
+        # Execute transaction
+        result = visit_business(visitor, business_id)
+        if "error" in result:
+            return await interaction.response.send_message(f'❌ {result["error"]}', ephemeral=True)
+
+        update_wallet(visitor,  -fee)
+        update_wallet(owner_id,  fee)
+
+        embed = discord.Embed(
+            title=f'{btype["emoji"]} ¡Visita completada!',
+            description=(
+                f'{result["visit_description"]}\n\n'
+                f'🏢 **{b["name"]}** de {self.owner.display_name}\n'
+                f'💸 Pagaste: 🪙 **{fee:,}**\n'
+                f'👤 El dueño recibió: 🪙 **{fee:,}**'
+            ),
+            color=0x3498DB,
+        )
+        embed.set_footer(text=f"Total visitas a este negocio: {b.get('visits', 0) + 1:,}")
+        await interaction.response.edit_message(embed=embed, view=None)
+
+    
 class BusinessCog(commands.Cog):
   def __init__(self, bot: commands.Bot):
       self.bot = bot
@@ -526,39 +593,38 @@ class BusinessCog(commands.Cog):
       await ctx.send(f'\u2705 Renamed to **{name[:40]}**!', ephemeral=True)
 
   # ── /business visit ───────────────────────────────────
-  @business.command(name="visit", description="Visit another player's business empire")
-  @app_commands.describe(member="The player to visit")
+  @business.command(name="visit", description="Visita el negocio de otro jugador y paga la entrada")
+  @app_commands.describe(member="El jugador cuyo negocio quieres visitar")
   async def business_visit(self, ctx: commands.Context, member: discord.Member):
       if member.id == ctx.author.id:
-          return await ctx.send("Use `/business list` to see your own businesses.", ephemeral=True)
+          return await ctx.send("Usa `/business list` para ver tus propios negocios.", ephemeral=True)
       businesses = get_owner_businesses(str(member.id))
       if not businesses:
-          return await ctx.send(f"**{member.display_name}** has no businesses yet.", ephemeral=True)
+          return await ctx.send(f"**{member.display_name}** no tiene negocios todavía.", ephemeral=True)
 
-      total_pending = 0
       embed = discord.Embed(
-          title=f"\U0001f3e2 {member.display_name}'s Business Empire",
-          description=f"\U0001f440 Visiting **{len(businesses)}** business(es)",
+          title=f"\U0001f3e2 Negocios de {member.display_name}",
+          description=(
+              f"Elige qué negocio visitar. Pagarás la entrada y ""
+              f"**{member.display_name}** recibirá el dinero al instante."
+          ),
           color=0x3498DB,
       )
       for b in businesses[:8]:
           btype = BUSINESS_TYPES[b["type"]]
-          info  = compute_income(b)
-          total_pending += max(0, info["net"])
+          fee   = btype.get("entry_fee", 0)
           embed.add_field(
-              name=f'{btype["emoji"]} {b["name"]} \u2014 Lv.{b["level"]}',
+              name=f'{btype["emoji"]} {b["name"]} (Lv.{b["level"]})',
               value=(
-                  f'\u2b50 Rep: {b.get("reputation", 50)}/100\n'
-                  f'\U0001f477 Workers: {len(b["workers"])}/{btype["max_workers"]}\n'
-                  f'\U0001f3d7\ufe0f Upgrades: {len(b.get("upgrades",[]))}/{len(btype["upgrades"])}'
+                  f'\U0001f3ab Entrada: \U0001fa99 **{fee:,}**\n'
+                  f'\u2b50 Rep: {b.get("reputation", 50)}/100  '
+                  f'\U0001f440 Visitas: {b.get("visits", 0):,}'
               ),
               inline=True,
           )
-          increment_visits(b["_id"])
-
       embed.set_thumbnail(url=member.display_avatar.url)
-      embed.set_footer(text=f"Combined pending income: \U0001fa99 {total_pending:,}")
-      await ctx.send(embed=embed)
+      view = VisitView(ctx, member, businesses)
+      await ctx.send(embed=embed, view=view)
 
   # ── /business leaderboard ─────────────────────────────
   @business.command(name="leaderboard", description="Top 10 businesses by total earnings")
