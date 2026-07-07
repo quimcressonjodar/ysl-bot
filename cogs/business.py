@@ -155,7 +155,7 @@ class HireConfirmView(discord.ui.View):
 
 
 class VisitView(discord.ui.View):
-  """Select menu para visitar el negocio de otro jugador y pagar la entrada."""
+  """Select menu to visit another player's business and pay the entry fee."""
 
   def __init__(self, ctx: commands.Context, owner: discord.Member, businesses: list[dict]):
       super().__init__(timeout=60)
@@ -167,13 +167,13 @@ class VisitView(discord.ui.View):
           fee   = btype.get("entry_fee", 0)
           options.append(discord.SelectOption(
               label=f'{b["name"][:50]} (Lv.{b["level"]})',
-              description=f'{btype["name"]} \u2022 Entrada: \U0001fa99 {fee:,}',
+              description=f'{btype["name"]} \u2022 Entry: \U0001fa99 {fee:,}',
               value=b["_id"],
               emoji=btype["emoji"],
           ))
       self.select.options = options
 
-  @discord.ui.select(placeholder="Elige qu\u00e9 negocio visitar\u2026", min_values=1, max_values=1)
+  @discord.ui.select(placeholder="Choose a business to visit\u2026", min_values=1, max_values=1)
   async def select(self, interaction: discord.Interaction, sel: discord.ui.Select):
       if str(interaction.user.id) != str(self.ctx.author.id):
           return await interaction.response.send_message("\u274c Not your menu.", ephemeral=True)
@@ -186,11 +186,11 @@ class VisitView(discord.ui.View):
       visitor  = str(interaction.user.id)
       owner_id = b["owner_id"]
       if visitor == owner_id:
-          return await interaction.response.send_message("\u274c Ese es tu propio negocio.", ephemeral=True)
+          return await interaction.response.send_message("\u274c That is your own business.", ephemeral=True)
       wallet = get_wallet(visitor)
       if wallet < fee:
           return await interaction.response.send_message(
-              f"\u274c Necesitas \U0001fa99 **{fee:,}** y tienes \U0001fa99 {wallet:,}.",
+              f"\u274c You need \U0001fa99 **{fee:,}** and you have \U0001fa99 {wallet:,}.",
               ephemeral=True,
           )
       result = visit_business(visitor, business_id)
@@ -199,16 +199,16 @@ class VisitView(discord.ui.View):
       update_wallet(visitor,  -fee)
       update_wallet(owner_id,  fee)
       embed = discord.Embed(
-          title=f'{btype["emoji"]} \u00a1Visita completada!',
+          title=f'{btype["emoji"]} Visit Complete!',
           description=(
               f'{result["visit_description"]}\n\n'
-              f'\U0001f3e2 **{b["name"]}** de {self.owner.display_name}\n'
-              f'\U0001f4b8 Pagaste: \U0001fa99 **{fee:,}**\n'
-              f'\U0001f464 El due\u00f1o recibi\u00f3: \U0001fa99 **{fee:,}**'
+              f'\U0001f3e2 **{b["name"]}** owned by {self.owner.display_name}\n'
+              f'\U0001f4b8 You paid: \U0001fa99 **{fee:,}**\n'
+              f'\U0001f464 Owner received: \U0001fa99 **{fee:,}**'
           ),
           color=0x3498DB,
       )
-      embed.set_footer(text=f"Visitas totales: {b.get('visits', 0) + 1:,}")
+      embed.set_footer(text=f"Total visits: {b.get('visits', 0) + 1:,}")
       await interaction.response.edit_message(embed=embed, view=None)
 
 
@@ -584,18 +584,18 @@ class BusinessCog(commands.Cog):
       await ctx.send(f'\u2705 Renamed to **{name[:40]}**!', ephemeral=True)
 
   # ── /business visit ───────────────────────────────────
-  @business.command(name="visit", description="Visita el negocio de otro jugador y paga la entrada")
-  @app_commands.describe(member="El jugador cuyo negocio quieres visitar")
+  @business.command(name="visit", description="Visit another player's business and pay the entry fee")
+  @app_commands.describe(member="The player whose business you want to visit")
   async def business_visit(self, ctx: commands.Context, member: discord.Member):
       if member.id == ctx.author.id:
-          return await ctx.send("Usa `/business list` para ver tus propios negocios.", ephemeral=True)
+          return await ctx.send("Use `/business list` to see your own businesses.", ephemeral=True)
       businesses = get_owner_businesses(str(member.id))
       if not businesses:
-          return await ctx.send(f"**{member.display_name}** no tiene negocios todavía.", ephemeral=True)
+          return await ctx.send(f"**{member.display_name}** has no businesses yet.", ephemeral=True)
 
       embed = discord.Embed(
-          title=f"\U0001f3e2 Negocios de {member.display_name}",
-          description=f"Elige qu\u00e9 negocio visitar. **{member.display_name}** recibir\u00e1 la entrada al instante.",
+          title=f"\U0001f3e2 {member.display_name}'s Businesses",
+          description=f"Choose a business to visit. **{member.display_name}** will receive the entry fee instantly.",
           color=0x3498DB,
       )
       for b in businesses[:8]:
@@ -604,9 +604,9 @@ class BusinessCog(commands.Cog):
           embed.add_field(
               name=f'{btype["emoji"]} {b["name"]} (Lv.{b["level"]})',
               value=(
-                  f'\U0001f3ab Entrada: \U0001fa99 **{fee:,}**\n'
+                  f'\U0001f3ab Entry: \U0001fa99 **{fee:,}**\n'
                   f'\u2b50 Rep: {b.get("reputation", 50)}/100  '
-                  f'\U0001f440 Visitas: {b.get("visits", 0):,}'
+                  f'\U0001f440 Visits: {b.get("visits", 0):,}'
               ),
               inline=True,
           )
@@ -652,7 +652,7 @@ class BusinessCog(commands.Cog):
           ("/business fire <id> <#>",            "Fire a worker by index"),
           ("/business sell <id>",                "Sell a business for coins"),
           ("/business rename <id> <name>",       "Rename a business"),
-          ("/business visit <member>",           "Visita el negocio de otro jugador"),
+          ("/business visit <member>",           "Visit another player's business"),
           ("/business leaderboard",              "Top 10 earners globally"),
       ]:
           embed.add_field(name=f"`{cmd}`", value=desc, inline=False)
