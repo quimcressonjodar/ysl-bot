@@ -74,139 +74,65 @@ class EventsCog(commands.Cog):
         )
         await channel.send(embed=embed)
 
-    @tasks.loop(hours=6)
-    async def spawn_global_drop(self):
-        now = time.time()
-        cutoff = now - 21600  # 6 hours in seconds
+    @tasks.loop(hours=9)
+      async def spawn_global_drop(self):
+          channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
+          if not channel:
+              return
 
-        # Atomically claim the drop slot: only succeeds when last_drop_time is stale.
-        # This prevents double-fires on restart and across multiple instances.
-        result = bot_state_col.update_one(
-            {"_id": "global_drop", "last_drop_time": {"$lt": cutoff}},
-            {"$set": {"last_drop_time": now}},
-            upsert=False,
-        )
-        if result.matched_count == 0:
-            # No doc exists yet (very first drop ever) OR too recent — handle first-ever case:
-            insert = bot_state_col.update_one(
-                {"_id": "global_drop"},
-                {"$setOnInsert": {"last_drop_time": now}},
-                upsert=True,
-            )
-            if not insert.upserted_id:
-                return  # Doc existed → too recent, skip
-        state.last_global_drop_time = now
+          drop_type = random.choice(["coins", "coins", "coins", "item", "item"])
 
-        channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
+          if drop_type == "coins":
+              reward = random.choice(GLOBAL_DROP_COIN_REWARDS)
+              state.active_global_drop = {"type": "coins", "reward": reward}
+              embed = discord.Embed(
+                  title="🌠 GLOBAL DROP",
+                  description=(
+                      "💸 A MASSIVE treasure drop appeared!\nFirst person to claim it wins!\n"
+                      "Use `!claimdrop` first!"
+                  ),
+                  color=0xF1C40F,
+              )
+              embed.add_field(name="💰 Coin Reward", value=f"🪙 {reward:,}")
+          else:
+              rarity_roll = random.randint(1, 100)
+              if rarity_roll <= 50:
+                  rarity = "common"
+              elif rarity_roll <= 80:
+                  rarity = "rare"
+              elif rarity_roll <= 94:
+                  rarity = "epic"
+              elif rarity_roll <= 99:
+                  rarity = "legendary"
+              else:
+                  rarity = "godly"
 
-        drop_type = random.choice(["coins", "coins", "coins", "item", "item"])
+              item_name, item_value = random.choice(ADVENTURE_LOOT[rarity])
+              rarity_colors = {
+                  "common": 0x95A5A6, "rare": 0x3498DB, "epic": 0x9B59B6, "legendary": 0xF1C40F, "godly": 0xFF00FF,
+              }
+              embed = discord.Embed(
+                  title="🌠 GLOBAL ITEM DROP",
+                  description="A mysterious item appeared from the skies!\n\nUse `!claimdrop` first!",
+                  color=rarity_colors[rarity],
+              )
+              embed.add_field(name="🎁 Item", value=item_name)
+              embed.add_field(name="✨ Rarity", value=rarity.capitalize())
+              state.active_global_drop = {
+                  "type": "item",
+                  "item": {"name": item_name, "value": item_value, "rarity": rarity},
+              }
 
-        if drop_type == "coins":
-            reward = random.choice(GLOBAL_DROP_COIN_REWARDS)
-            state.active_global_drop = {"type": "coins", "reward": reward}
+          if drop_type == "item" and rarity in ("godly", "legendary"):
+              hype = "🌌 A GODLY item has appeared!!! THE UNIVERSE TREMBLES!" if rarity == "godly" else "🌌 A LEGENDARY item has appeared!!!"
+              await channel.send(hype)
+          await channel.send(embed=embed)
 
-            embed = discord.Embed(
-                title="🌠 GLOBAL DROP",
-                description=(
-                    "💸 A MASSIVE treasure drop appeared!\nFirst person to claim it wins!\n"
-                    "Use `!claimdrop` first!"
-                ),
-                color=0xF1C40F,
-            )
-            embed.add_field(name="💰 Coin Reward", value=f"🪙 {reward:,}")
-        else:
-            rarity_roll = random.randint(1, 100)
-            if rarity_roll <= 50:
-                rarity = "common"
-            elif rarity_roll <= 80:
-                rarity = "rare"
-            elif rarity_roll <= 94:
-                rarity = "epic"
-            elif rarity_roll <= 99:
-                rarity = "legendary"
-            else:
-                rarity = "godly"
+      @spawn_global_drop.before_loop
+      async def before_spawn_global_drop(self):
+          await self.bot.wait_until_ready()
 
-            item_name, item_value = random.choice(ADVENTURE_LOOT[rarity])
-
-            rarity_colors = {
-                "common": 0x95A5A6, "rare": 0x3498DB, "epic": 0x9B59B6, "legendary": 0xF1C40F, "godly": 0xFF00FF,
-            }
-            embed = discord.Embed(
-                title="🌠 GLOBAL ITEM DROP",
-                description="A mysterious item appeared from the skies!\n\nUse `!claimdrop` first!",
-                color=rarity_colors[rarity],
-            )
-            embed.add_field(name="🎁 Item", value=item_name)
-            embed.add_field(name="✨ Rarity", value=rarity.capitalize())
-
-            state.active_global_drop = {
-                "type": "item",
-                "item": {"name": item_name, "value": item_value, "rarity": rarity},
-            }
-
-        if not channel:
-            logger.warning("GLOBAL DROP: channel not found, drop skipped")
-            return
-
-        try:
-            if drop_type == "item" and rarity in ("godly", "legendary"):
-                hype = "🌌 A GODLY item has appeared!!! THE UNIVERSE TREMBLES!" if rarity == "godly" else "🌌 A LEGENDARY item has appeared!!!"
-                await channel.send(hype)
-            await channel.send(embed=embed)
-        except Exception as e:
-            logger.error(f"GLOBAL DROP SEND ERROR: {e}")
-            # Restore old timestamp so the next loop iteration can retry
-            bot_state_col.update_one(
-                {"_id": "global_drop"},
-                {"$set": {"last_drop_time": cutoff - 1}},
-            )
-            state.last_global_drop_time = 0
-
-    @spawn_global_drop.before_loop
-    async def before_spawn_global_drop(self):
-        await self.bot.wait_until_ready()
-        # Load persisted last drop time from DB so restarts don't trigger an immediate drop
-        doc = bot_state_col.find_one({"_id": "global_drop"})
-        state.last_global_drop_time = doc["last_drop_time"] if doc else 0
-
-    @tasks.loop(hours=1)
-    async def process_interests(self):
-        """
-        Procesa los intereses de los préstamos cada hora.
-        Aplica un 2% de interés diario prorrateado por el tiempo transcurrido.
-        """
-        now = time.time()
-        # Buscamos usuarios con préstamos activos (principal > 0)
-        users_with_loans = eco_col.find({"loan_amount": {"$gt": 0}})
-        
-        for user_data in users_with_loans:
-            user_id = user_data["_id"]
-            last_calc = user_data.get("last_interest_calc", now)
-            
-            time_diff = now - last_calc
-            # Si ha pasado al menos una hora (para evitar cálculos excesivos)
-            if time_diff >= 3600:
-                loan_amount = user_data.get("loan_amount", 0)
-                # Tasa diaria del 2% (0.02). Calculamos la proporción del tiempo transcurrido.
-                # interés = principal * tasa_diaria * (segundos_transcurridos / segundos_en_un_día)
-                interest = int(loan_amount * 0.02 * (time_diff / 86400))
-                
-                if interest > 0:
-                    eco_col.update_one(
-                        {"_id": user_id},
-                        {
-                            "$inc": {"interest_accrued": interest},
-                            "$set": {"last_interest_calc": now}
-                        }
-                    )
-                    logger.info(f"Applied {interest} interest to user {user_id} for {time_diff/3600:.2f} hours")
-                elif time_diff >= 86400:
-                    # Si ha pasado un día pero el interés es 0 (préstamo muy pequeño),
-                    # actualizamos el timestamp para evitar bucles infinitos
-                    eco_col.update_one({"_id": user_id}, {"$set": {"last_interest_calc": now}})
-
-    @process_interests.before_loop
+        @process_interests.before_loop
     async def before_process_interests(self):
         await self.bot.wait_until_ready()
 
