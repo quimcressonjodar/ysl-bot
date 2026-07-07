@@ -75,87 +75,61 @@ class EventsCog(commands.Cog):
         await channel.send(embed=embed)
 
     @tasks.loop(hours=9)
-      async def spawn_global_drop(self):
-          channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
-          if not channel:
-              return
+    async def spawn_global_drop(self):
+        channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
+        if not channel:
+            return
 
-          drop_type = random.choice(["coins", "coins", "coins", "item", "item"])
+        drop_type = random.choice(["coins", "coins", "coins", "item", "item"])
 
-          if drop_type == "coins":
-              reward = random.choice(GLOBAL_DROP_COIN_REWARDS)
-              state.active_global_drop = {"type": "coins", "reward": reward}
-              embed = discord.Embed(
-                  title="🌠 GLOBAL DROP",
-                  description=(
-                      "💸 A MASSIVE treasure drop appeared!\nFirst person to claim it wins!\n"
-                      "Use `!claimdrop` first!"
-                  ),
-                  color=0xF1C40F,
-              )
-              embed.add_field(name="💰 Coin Reward", value=f"🪙 {reward:,}")
-          else:
-              rarity_roll = random.randint(1, 100)
-              if rarity_roll <= 50:
-                  rarity = "common"
-              elif rarity_roll <= 80:
-                  rarity = "rare"
-              elif rarity_roll <= 94:
-                  rarity = "epic"
-              elif rarity_roll <= 99:
-                  rarity = "legendary"
-              else:
-                  rarity = "godly"
+        if drop_type == "coins":
+            reward = random.choice(GLOBAL_DROP_COIN_REWARDS)
+            state.active_global_drop = {"type": "coins", "reward": reward}
+            embed = discord.Embed(
+                title="U0001f320 GLOBAL DROP",
+                description=(
+                    "U0001f4b8 A MASSIVE treasure drop appeared!\nFirst person to claim it wins!\n"
+                    "Use `!claimdrop` first!"
+                ),
+                color=0xF1C40F,
+            )
+            embed.add_field(name="U0001f4b0 Coin Reward", value=f"U0001fa99 {reward:,}")
+        else:
+            rarity_roll = random.randint(1, 100)
+            if rarity_roll <= 50:
+                rarity = "common"
+            elif rarity_roll <= 80:
+                rarity = "rare"
+            elif rarity_roll <= 94:
+                rarity = "epic"
+            elif rarity_roll <= 99:
+                rarity = "legendary"
+            else:
+                rarity = "godly"
 
-              item_name, item_value = random.choice(ADVENTURE_LOOT[rarity])
-              rarity_colors = {
-                  "common": 0x95A5A6, "rare": 0x3498DB, "epic": 0x9B59B6, "legendary": 0xF1C40F, "godly": 0xFF00FF,
-              }
-              embed = discord.Embed(
-                  title="🌠 GLOBAL ITEM DROP",
-                  description="A mysterious item appeared from the skies!\n\nUse `!claimdrop` first!",
-                  color=rarity_colors[rarity],
-              )
-              embed.add_field(name="🎁 Item", value=item_name)
-              embed.add_field(name="✨ Rarity", value=rarity.capitalize())
-              state.active_global_drop = {
-                  "type": "item",
-                  "item": {"name": item_name, "value": item_value, "rarity": rarity},
-              }
+            item_name, item_value = random.choice(ADVENTURE_LOOT[rarity])
+            rarity_colors = {
+                "common": 0x95A5A6, "rare": 0x3498DB, "epic": 0x9B59B6,
+                "legendary": 0xF1C40F, "godly": 0xFF00FF,
+            }
+            embed = discord.Embed(
+                title="U0001f320 GLOBAL ITEM DROP",
+                description="A mysterious item appeared from the skies!\n\nUse `!claimdrop` first!",
+                color=rarity_colors[rarity],
+            )
+            embed.add_field(name="U0001f381 Item", value=item_name)
+            embed.add_field(name="✨ Rarity", value=rarity.capitalize())
+            state.active_global_drop = {
+                "type": "item",
+                "item": {"name": item_name, "value": item_value, "rarity": rarity},
+            }
 
-          if drop_type == "item" and rarity in ("godly", "legendary"):
-              hype = "🌌 A GODLY item has appeared!!! THE UNIVERSE TREMBLES!" if rarity == "godly" else "🌌 A LEGENDARY item has appeared!!!"
-              await channel.send(hype)
-          await channel.send(embed=embed)
+        if drop_type == "item" and rarity in ("godly", "legendary"):
+            hype = "U0001f30c A GODLY item has appeared!!! THE UNIVERSE TREMBLES!" if rarity == "godly" else "U0001f30c A LEGENDARY item has appeared!!!"
+            await channel.send(hype)
+        await channel.send(embed=embed)
 
-      @spawn_global_drop.before_loop
-      async def before_spawn_global_drop(self):
-          await self.bot.wait_until_ready()
-
-        @process_interests.before_loop
-    async def before_process_interests(self):
+    @spawn_global_drop.before_loop
+    async def before_spawn_global_drop(self):
         await self.bot.wait_until_ready()
 
-
-    @commands.Cog.listener()
-    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
-        if isinstance(error, commands.CommandNotFound):
-            return
-        from utils.economy import JailCheckError
-        if isinstance(error, JailCheckError):
-            return  # jail message already sent; swallow silently
-
-        logger.error(f"Error in command {ctx.command}: {error}", exc_info=error)
-        
-        if isinstance(error, commands.MissingPermissions):
-            await ctx.send("❌ You don't have permission to use this command.", ephemeral=True)
-        elif isinstance(error, commands.BotMissingPermissions):
-            await ctx.send("❌ I don't have permission to do that.", ephemeral=True)
-        elif isinstance(error, commands.CommandOnCooldown):
-            next_ts = int(time.time() + error.retry_after)
-            await ctx.send(f"⏳ This command is on cooldown. Try again <t:{next_ts}:R>.", ephemeral=True)
-        else:
-            await ctx.send(f"❌ An error occurred: {str(error)}", ephemeral=True)
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(EventsCog(bot))
