@@ -51,6 +51,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Chef", "Waiter", "Cashier", "Manager"],
       "worker_base_salary": 180,
+      "entry_fee": 500,
+      "visit_benefit": {"type": "feed_pets", "value": 30},
+      "visit_description": "\U0001f35c Your pets enjoyed a delicious meal! Their hunger was restored by **+30**.",
       "upgrades": {
           "better_kitchen":  {"name": "Better Kitchen",  "emoji": "\U0001f373", "cost": 20_000,  "income_bonus": 0.15, "req_level": 1},
           "outdoor_seating": {"name": "Outdoor Seating", "emoji": "\U0001fa91", "cost": 35_000,  "income_bonus": 0.20, "req_level": 3},
@@ -68,6 +71,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Projectionist", "Ticket Seller", "Usher", "Manager"],
       "worker_base_salary": 220,
+      "entry_fee": 800,
+      "visit_benefit": {"type": "coins", "value": 400},
+      "visit_description": "\U0001f3ac You watched an incredible film and won a prize draw! You received \U0001fa99 **400**.",
       "upgrades": {
           "new_projectors": {"name": "New Projectors", "emoji": "\U0001f4fd\ufe0f", "cost": 30_000,  "income_bonus": 0.15, "req_level": 1},
           "vip_seats":      {"name": "VIP Seats",      "emoji": "\U0001f6cb\ufe0f","cost": 50_000,  "income_bonus": 0.20, "req_level": 3},
@@ -85,6 +91,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Cashier", "Stock Clerk", "Security", "Manager"],
       "worker_base_salary": 130,
+      "entry_fee": 300,
+      "visit_benefit": {"type": "coins", "value": 150},
+      "visit_description": "\U0001f6d2 You grabbed a great deal and got a cashback reward of \U0001fa99 **150**!",
       "upgrades": {
           "self_checkout":   {"name": "Self-Checkout",   "emoji": "\U0001f916",     "cost": 15_000,  "income_bonus": 0.15, "req_level": 1},
           "loyalty_program": {"name": "Loyalty Program", "emoji": "\U0001f3ab",     "cost": 25_000,  "income_bonus": 0.20, "req_level": 3},
@@ -102,6 +111,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Lifeguard", "Ride Operator", "Ticket Seller", "Janitor", "Manager"],
       "worker_base_salary": 280,
+      "entry_fee": 1_500,
+      "visit_benefit": {"type": "feed_pets", "value": 25},
+      "visit_description": "\U0001f30a Your pets splashed around and had a blast! Their hunger was restored by **+25**.",
       "upgrades": {
           "wave_pool":    {"name": "Wave Pool",    "emoji": "\U0001f3c4",     "cost": 80_000,  "income_bonus": 0.20, "req_level": 2},
           "lazy_river":   {"name": "Lazy River",   "emoji": "\U0001f6f6",     "cost": 120_000, "income_bonus": 0.25, "req_level": 4},
@@ -119,6 +131,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Curator", "Guide", "Security Guard", "Restorer", "Manager"],
       "worker_base_salary": 250,
+      "entry_fee": 1_000,
+      "visit_benefit": {"type": "coins", "value": 500},
+      "visit_description": "\U0001f3db\ufe0f A cultured visit! You found a rare artifact in the gift shop worth \U0001fa99 **500**.",
       "upgrades": {
           "digital_exhibits": {"name": "Digital Exhibits", "emoji": "\U0001f4f1",     "cost": 50_000,  "income_bonus": 0.20, "req_level": 2},
           "gift_shop":        {"name": "Gift Shop",        "emoji": "\U0001f381",     "cost": 30_000,  "income_bonus": 0.15, "req_level": 1},
@@ -136,6 +151,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Receptionist", "Housekeeper", "Bellhop", "Chef", "Manager"],
       "worker_base_salary": 270,
+      "entry_fee": 2_000,
+      "visit_benefit": {"type": "feed_pets", "value": 100},
+      "visit_description": "\U0001f3e8 Luxury stay! Your pets were fully pampered — hunger **fully restored to 100**!",
       "upgrades": {
           "spa":             {"name": "Spa & Wellness",  "emoji": "\U0001f9d6", "cost": 80_000,  "income_bonus": 0.20, "req_level": 2},
           "rooftop_pool":    {"name": "Rooftop Pool",    "emoji": "\U0001f3ca", "cost": 150_000, "income_bonus": 0.25, "req_level": 4},
@@ -153,6 +171,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Trainer", "Receptionist", "Cleaner", "Manager"],
       "worker_base_salary": 160,
+      "entry_fee": 400,
+      "visit_benefit": {"type": "strength", "value": 50},
+      "visit_description": "\U0001f4aa Great workout! You gained **+50 Strength XP**. Keep training!",
       "upgrades": {
           "new_equipment":     {"name": "New Equipment",     "emoji": "\U0001f3c3",                       "cost": 20_000, "income_bonus": 0.20, "req_level": 1},
           "sauna":             {"name": "Sauna Room",         "emoji": "\u2668\ufe0f",                    "cost": 35_000, "income_bonus": 0.20, "req_level": 3},
@@ -170,6 +191,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Barista", "Cashier", "Baker", "Manager"],
       "worker_base_salary": 110,
+      "entry_fee": 200,
+      "visit_benefit": {"type": "feed_pets", "value": 15},
+      "visit_description": "\u2615 Your pets enjoyed a cozy snack at the café! Their hunger was restored by **+15**.",
       "upgrades": {
           "espresso_machine": {"name": "Premium Espresso", "emoji": "\u2615",     "cost": 12_000, "income_bonus": 0.15, "req_level": 1},
           "coworking_space":  {"name": "Co-Working Space", "emoji": "\U0001f4bb", "cost": 20_000, "income_bonus": 0.20, "req_level": 2},
@@ -187,6 +211,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Baker", "Cashier", "Delivery Driver", "Manager"],
       "worker_base_salary": 100,
+      "entry_fee": 200,
+      "visit_benefit": {"type": "feed_pets", "value": 20},
+      "visit_description": "\U0001f956 Fresh pastries shared with your pets! Their hunger was restored by **+20**.",
       "upgrades": {
           "brick_oven":       {"name": "Brick Oven",       "emoji": "\U0001f525", "cost": 10_000, "income_bonus": 0.15, "req_level": 1},
           "custom_cakes":     {"name": "Custom Cakes",     "emoji": "\U0001f382", "cost": 18_000, "income_bonus": 0.20, "req_level": 2},
@@ -204,6 +231,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Attendant", "Cashier", "Mechanic", "Manager"],
       "worker_base_salary": 150,
+      "entry_fee": 500,
+      "visit_benefit": {"type": "coins", "value": 250},
+      "visit_description": "\u26fd You grabbed snacks and got a fuel cashback of \U0001fa99 **250**!",
       "upgrades": {
           "car_wash":          {"name": "Car Wash",         "emoji": "\U0001f697", "cost": 25_000,  "income_bonus": 0.20, "req_level": 1},
           "convenience_store": {"name": "Convenience Store","emoji": "\U0001f3ea", "cost": 40_000,  "income_bonus": 0.20, "req_level": 3},
@@ -221,6 +251,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Sales Agent", "Mechanic", "Receptionist", "Finance Advisor", "Manager"],
       "worker_base_salary": 300,
+      "entry_fee": 2_500,
+      "visit_benefit": {"type": "coins", "value": 1_000},
+      "visit_description": "\U0001f698 You test-drove a luxury car and earned a referral bonus of \U0001fa99 **1,000**!",
       "upgrades": {
           "showroom_upgrade": {"name": "Premium Showroom", "emoji": "\u2728",             "cost": 60_000,  "income_bonus": 0.20, "req_level": 2},
           "luxury_models":    {"name": "Luxury Models",    "emoji": "\U0001f3ce\ufe0f",  "cost": 120_000, "income_bonus": 0.30, "req_level": 4},
@@ -238,6 +271,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Operator", "Engineer", "Quality Control", "Foreman", "Manager"],
       "worker_base_salary": 350,
+      "entry_fee": 3_000,
+      "visit_benefit": {"type": "coins", "value": 1_500},
+      "visit_description": "\U0001f3ed You took a factory tour and negotiated a side deal worth \U0001fa99 **1,500**!",
       "upgrades": {
           "automation":    {"name": "Automation Line", "emoji": "\U0001f916",     "cost": 100_000, "income_bonus": 0.25, "req_level": 2},
           "solar_panels":  {"name": "Solar Panels",    "emoji": "\u2600\ufe0f",  "cost": 80_000,  "income_bonus": 0.15, "req_level": 1},
@@ -255,6 +291,9 @@ BUSINESS_TYPES: dict[str, dict] = {
       "sell_multiplier": 0.60,
       "worker_roles": ["Technician", "Cashier", "Security", "Manager"],
       "worker_base_salary": 145,
+      "entry_fee": 500,
+      "visit_benefit": {"type": "coins", "value": 300},
+      "visit_description": "\U0001f579\ufe0f You smashed the high score and cashed in your tickets for \U0001fa99 **300**!",
       "upgrades": {
           "vr_zone":          {"name": "VR Zone",          "emoji": "\U0001f97d", "cost": 30_000,  "income_bonus": 0.20, "req_level": 1},
           "tournament_stage": {"name": "Tournament Stage", "emoji": "\U0001f3c6", "cost": 45_000,  "income_bonus": 0.20, "req_level": 3},
@@ -490,22 +529,23 @@ def rename_business(business_id: str, new_name: str) -> dict:
 
 
 def visit_business(visitor_id: str, business_id: str) -> dict:
-  """Visitor pays entry fee; owner receives it. Returns transaction details."""
+  """Visitor pays entry fee; owner receives it. Returns transaction details including benefit spec."""
   business = get_business(business_id)
   if not business:
       return {"error": "Business not found."}
   btype = BUSINESS_TYPES[business["type"]]
-  fee   = btype.get("entry_fee", 0)
-  desc  = btype.get("visit_description", "You visited the business.")
-  # Increment visit counter
+  fee     = btype.get("entry_fee", 0)
+  desc    = btype.get("visit_description", "You visited the business.")
+  benefit = btype.get("visit_benefit", {"type": "none", "value": 0})
   businesses_col.update_one({"_id": business_id}, {"$inc": {"visits": 1}})
   return {
-      "ok":          True,
-      "fee":         fee,
-      "owner_id":    business["owner_id"],
-      "btype_name":  btype["name"],
-      "btype_emoji": btype["emoji"],
+      "ok":                True,
+      "fee":               fee,
+      "owner_id":          business["owner_id"],
+      "btype_name":        btype["name"],
+      "btype_emoji":       btype["emoji"],
       "visit_description": desc,
+      "visit_benefit":     benefit,
   }
 
 
