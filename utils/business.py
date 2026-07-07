@@ -489,25 +489,26 @@ def rename_business(business_id: str, new_name: str) -> dict:
 
 
 
-    def visit_business(visitor_id: str, business_id: str) -> dict:
-      """Visitor pays entry fee; owner receives it. Returns transaction details."""
-      business = get_business(business_id)
-      if not business:
-          return {"error": "Business not found."}
-      btype = BUSINESS_TYPES[business["type"]]
-      fee   = btype.get("entry_fee", 0)
-      desc  = btype.get("visit_description", "You visited the business.")
-      # Increment visit counter
-      businesses_col.update_one({"_id": business_id}, {"$inc": {"visits": 1}})
-      return {
-          "ok":          True,
-          "fee":         fee,
-          "owner_id":    business["owner_id"],
-          "btype_name":  btype["name"],
-          "btype_emoji": btype["emoji"],
-          "visit_description": desc,
-      }
-    
+def visit_business(visitor_id: str, business_id: str) -> dict:
+  """Visitor pays entry fee; owner receives it. Returns transaction details."""
+  business = get_business(business_id)
+  if not business:
+      return {"error": "Business not found."}
+  btype = BUSINESS_TYPES[business["type"]]
+  fee   = btype.get("entry_fee", 0)
+  desc  = btype.get("visit_description", "You visited the business.")
+  # Increment visit counter
+  businesses_col.update_one({"_id": business_id}, {"$inc": {"visits": 1}})
+  return {
+      "ok":          True,
+      "fee":         fee,
+      "owner_id":    business["owner_id"],
+      "btype_name":  btype["name"],
+      "btype_emoji": btype["emoji"],
+      "visit_description": desc,
+  }
+
+
 def increment_visits(business_id: str) -> None:
   businesses_col.update_one({"_id": business_id}, {"$inc": {"visits": 1}})
 
