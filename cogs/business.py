@@ -9,7 +9,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+import time as _time
+from database import pets_col, eco_col
 from utils.economy import get_wallet, update_wallet
+from utils.pets import get_current_hunger
 from utils.business import (
   BUSINESS_TYPES,
   get_business, get_owner_businesses,
@@ -196,17 +199,59 @@ class VisitView(discord.ui.View):
       result = visit_business(visitor, business_id)
       if "error" in result:
           return await interaction.response.send_message(f'\u274c {result["error"]}', ephemeral=True)
+
+      # ── Deduct entry fee & pay owner ──────────────────────
       update_wallet(visitor,  -fee)
       update_wallet(owner_id,  fee)
+
+      # ── Apply visitor benefit ─────────────────────────────
+      benefit      = result.get("visit_benefit", {"type": "none", "value": 0})
+      benefit_type = benefit.get("type", "none")
+      benefit_val  = benefit.get("value", 0)
+      benefit_line = ""
+
+      if benefit_type == "feed_pets":
+          # Feed all pets the visitor owns
+          owner_data = pets_col.find_one({"_id": visitor})
+          if owner_data and owner_data.get("pets"):
+              pets = owner_data["pets"]
+              now  = _time.time()
+              fed_count = 0
+              for pet in pets:
+                  current_hunger = get_current_hunger(pet)
+                  new_hunger     = min(100, current_hunger + benefit_val)
+                  pet["hunger"]   = new_hunger
+                  pet["last_fed"] = now
+                  fed_count += 1
+              pets_col.update_one({"_id": visitor}, {"$set": {"pets": pets}})
+              benefit_line = f"\U0001f43e **Pets fed:** {fed_count} pet(s) +{benefit_val} hunger"
+          else:
+              benefit_line = "\U0001f43e No pets to feed — get a pet to enjoy this perk!"
+
+      elif benefit_type == "coins":
+          update_wallet(visitor, benefit_val)
+          benefit_line = f"\U0001fa99 **Bonus earned:** {benefit_val:,} coins"
+
+      elif benefit_type == "strength":
+          eco_col.update_one(
+              {"_id": visitor},
+              {"$inc": {"strength": benefit_val}},
+              upsert=True,
+          )
+          user_data = eco_col.find_one({"_id": visitor}) or {}
+          total_str = user_data.get("strength", benefit_val)
+          benefit_line = f"\U0001f4aa **Strength gained:** +{benefit_val} XP (Total: {total_str:,})"
+
       embed = discord.Embed(
           title=f'{btype["emoji"]} Visit Complete!',
           description=(
               f'{result["visit_description"]}\n\n'
               f'\U0001f3e2 **{b["name"]}** owned by {self.owner.display_name}\n'
               f'\U0001f4b8 You paid: \U0001fa99 **{fee:,}**\n'
-              f'\U0001f464 Owner received: \U0001fa99 **{fee:,}**'
+              f'\U0001f464 Owner received: \U0001fa99 **{fee:,}**\n'
+              f'{benefit_line}'
           ),
-          color=0x3498DB,
+          color=0x2ecc71,
       )
       embed.set_footer(text=f"Total visits: {b.get('visits', 0) + 1:,}")
       await interaction.response.edit_message(embed=embed, view=None)
