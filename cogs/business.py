@@ -411,15 +411,6 @@ class BusinessCog(commands.Cog):
           embed.add_field(name="\U0001f3c6 Level Ups!", value="\n".join(level_ups), inline=False)
       await ctx.send(embed=embed)
 
-  @business_collect.error
-  async def collect_error(self, ctx: commands.Context, error: Exception):
-      if isinstance(error, commands.CommandOnCooldown):
-          mins = int(error.retry_after // 60)
-          secs = int(error.retry_after % 60)
-          msg  = f"\u23f0 Ya cobraste hace poco! Inténtalo en **{mins}m {secs}s**." if mins else f"\u23f0 Inténtalo en **{secs}s**."
-          return await ctx.send(msg, ephemeral=True)
-      raise error
-
   # ── /business upgrades ────────────────────────────────
   @business.command(name="upgrades", description="View all upgrades for a business")
   @app_commands.describe(business_id="Business ID")
