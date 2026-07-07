@@ -17,9 +17,9 @@ from utils.business import (
   buy_business, apply_upgrade,
   hire_worker, fire_worker,
   sell_business, rename_business,
-  increment_visits, get_leaderboard,
-  get_xp_for_next_level, XP_PER_LEVEL,
-  businesses_col,
+  visit_business, increment_visits,
+  get_leaderboard, get_xp_for_next_level,
+  XP_PER_LEVEL, businesses_col,
 )
 
 
@@ -154,77 +154,68 @@ class HireConfirmView(discord.ui.View):
       await interaction.response.edit_message(content="Hiring cancelled.", embed=None, view=None)
 
 
+class VisitView(discord.ui.View):
+  """Select menu para visitar el negocio de otro jugador y pagar la entrada."""
+
+  def __init__(self, ctx: commands.Context, owner: discord.Member, businesses: list[dict]):
+      super().__init__(timeout=60)
+      self.ctx   = ctx
+      self.owner = owner
+      options = []
+      for b in businesses[:25]:
+          btype = BUSINESS_TYPES[b["type"]]
+          fee   = btype.get("entry_fee", 0)
+          options.append(discord.SelectOption(
+              label=f'{b["name"][:50]} (Lv.{b["level"]})',
+              description=f'{btype["name"]} \u2022 Entrada: \U0001fa99 {fee:,}',
+              value=b["_id"],
+              emoji=btype["emoji"],
+          ))
+      self.select.options = options
+
+  @discord.ui.select(placeholder="Elige qu\u00e9 negocio visitar\u2026", min_values=1, max_values=1)
+  async def select(self, interaction: discord.Interaction, sel: discord.ui.Select):
+      if str(interaction.user.id) != str(self.ctx.author.id):
+          return await interaction.response.send_message("\u274c Not your menu.", ephemeral=True)
+      business_id = sel.values[0]
+      b = get_business(business_id)
+      if not b:
+          return await interaction.response.send_message("\u274c Business not found.", ephemeral=True)
+      btype    = BUSINESS_TYPES[b["type"]]
+      fee      = btype.get("entry_fee", 0)
+      visitor  = str(interaction.user.id)
+      owner_id = b["owner_id"]
+      if visitor == owner_id:
+          return await interaction.response.send_message("\u274c Ese es tu propio negocio.", ephemeral=True)
+      wallet = get_wallet(visitor)
+      if wallet < fee:
+          return await interaction.response.send_message(
+              f"\u274c Necesitas \U0001fa99 **{fee:,}** y tienes \U0001fa99 {wallet:,}.",
+              ephemeral=True,
+          )
+      result = visit_business(visitor, business_id)
+      if "error" in result:
+          return await interaction.response.send_message(f'\u274c {result["error"]}', ephemeral=True)
+      update_wallet(visitor,  -fee)
+      update_wallet(owner_id,  fee)
+      embed = discord.Embed(
+          title=f'{btype["emoji"]} \u00a1Visita completada!',
+          description=(
+              f'{result["visit_description"]}\n\n'
+              f'\U0001f3e2 **{b["name"]}** de {self.owner.display_name}\n'
+              f'\U0001f4b8 Pagaste: \U0001fa99 **{fee:,}**\n'
+              f'\U0001f464 El due\u00f1o recibi\u00f3: \U0001fa99 **{fee:,}**'
+          ),
+          color=0x3498DB,
+      )
+      embed.set_footer(text=f"Visitas totales: {b.get('visits', 0) + 1:,}")
+      await interaction.response.edit_message(embed=embed, view=None)
+
+
 # ─────────────────────────────────────────────────────────
 # COG
 # ─────────────────────────────────────────────────────────
 
-    class VisitView(discord.ui.View):
-    """Select-based view to pick which business to visit and pay entry."""
-
-    def __init__(self, ctx: commands.Context, owner: discord.Member, businesses: list[dict]):
-        super().__init__(timeout=60)
-        self.ctx   = ctx
-        self.owner = owner
-        options    = []
-        for b in businesses[:25]:
-            btype = BUSINESS_TYPES[b["type"]]
-            fee   = btype.get("entry_fee", 0)
-            options.append(discord.SelectOption(
-                label=f'{b["name"][:50]} (Lv.{b["level"]})',
-                description=f'{btype["name"]} • Entry: 🪙 {fee:,}',
-                value=b["_id"],
-                emoji=btype["emoji"],
-            ))
-        self.select.options = options
-
-    @discord.ui.select(placeholder="Choose a business to visit…", min_values=1, max_values=1)
-    async def select(self, interaction: discord.Interaction, select: discord.ui.Select):
-        if str(interaction.user.id) != str(self.ctx.author.id):
-            return await interaction.response.send_message("❌ Not your menu.", ephemeral=True)
-
-        business_id = select.values[0]
-        b    = get_business(business_id)
-        if not b:
-            return await interaction.response.send_message("❌ Business not found.", ephemeral=True)
-
-        btype    = BUSINESS_TYPES[b["type"]]
-        fee      = btype.get("entry_fee", 0)
-        visitor  = str(interaction.user.id)
-        owner_id = b["owner_id"]
-
-        # Can't visit own business through visit command
-        if visitor == owner_id:
-            return await interaction.response.send_message("❌ Ese es tu propio negocio.", ephemeral=True)
-
-        wallet = get_wallet(visitor)
-        if wallet < fee:
-            return await interaction.response.send_message(
-                f"❌ No tienes suficiente dinero. Necesitas 🪙 **{fee:,}** y tienes 🪙 {wallet:,}.",
-                ephemeral=True,
-            )
-
-        # Execute transaction
-        result = visit_business(visitor, business_id)
-        if "error" in result:
-            return await interaction.response.send_message(f'❌ {result["error"]}', ephemeral=True)
-
-        update_wallet(visitor,  -fee)
-        update_wallet(owner_id,  fee)
-
-        embed = discord.Embed(
-            title=f'{btype["emoji"]} ¡Visita completada!',
-            description=(
-                f'{result["visit_description"]}\n\n'
-                f'🏢 **{b["name"]}** de {self.owner.display_name}\n'
-                f'💸 Pagaste: 🪙 **{fee:,}**\n'
-                f'👤 El dueño recibió: 🪙 **{fee:,}**'
-            ),
-            color=0x3498DB,
-        )
-        embed.set_footer(text=f"Total visitas a este negocio: {b.get('visits', 0) + 1:,}")
-        await interaction.response.edit_message(embed=embed, view=None)
-
-    
 class BusinessCog(commands.Cog):
   def __init__(self, bot: commands.Bot):
       self.bot = bot
@@ -281,7 +272,7 @@ class BusinessCog(commands.Cog):
       result = buy_business(user_id, btype_key, name)
 
       embed = discord.Embed(
-          title=f'\U0001f389 Business Opened!',
+          title='\U0001f389 Business Opened!',
           description=(
               f'{btype["emoji"]} You now own **{name}**!\n\n'
               f'\U0001f4b0 Paid: \U0001fa99 {cost:,}\n'
@@ -334,11 +325,11 @@ class BusinessCog(commands.Cog):
               status = f'\U0001f512 Lv.{upg["req_level"]} required'
           else:
               status = f'\U0001f6d2 \U0001fa99 {upg["cost"]:,}'
-          upg_lines.append(f'{upg["emoji"]} **{upg["name"]}** — {status} (+{int(upg["income_bonus"]*100)}%)')
+          upg_lines.append(f'{upg["emoji"]} **{upg["name"]}** \u2014 {status} (+{int(upg["income_bonus"]*100)}%)')
 
       workers      = b.get("workers", [])
       worker_lines = [
-          f'`#{i}` **{w["name"]}** ({w["role"]}) — \U0001fa99{w["salary"]:,}/hr | \u2699\ufe0f{w["efficiency"]:.2f}x | Lv.{w["level"]}'
+          f'`#{i}` **{w["name"]}** ({w["role"]}) \u2014 \U0001fa99{w["salary"]:,}/hr | \u2699\ufe0f{w["efficiency"]:.2f}x | Lv.{w["level"]}'
           for i, w in enumerate(workers)
       ] or ["*No workers hired.*"]
 
@@ -419,6 +410,15 @@ class BusinessCog(commands.Cog):
       if level_ups:
           embed.add_field(name="\U0001f3c6 Level Ups!", value="\n".join(level_ups), inline=False)
       await ctx.send(embed=embed)
+
+  @business_collect.error
+  async def collect_error(self, ctx: commands.Context, error: Exception):
+      if isinstance(error, commands.CommandOnCooldown):
+          mins = int(error.retry_after // 60)
+          secs = int(error.retry_after % 60)
+          msg  = f"\u23f0 Ya cobraste hace poco! Inténtalo en **{mins}m {secs}s**." if mins else f"\u23f0 Inténtalo en **{secs}s**."
+          return await ctx.send(msg, ephemeral=True)
+      raise error
 
   # ── /business upgrades ────────────────────────────────
   @business.command(name="upgrades", description="View all upgrades for a business")
@@ -572,7 +572,7 @@ class BusinessCog(commands.Cog):
           description=(
               f'Sell **{b["name"]}**?\n\n'
               f'\U0001fa99 You will receive: **{sell_price:,}**\n'
-              f'*(60% of cost + upgrades + {(level-1)*5}% level bonus — this cannot be undone!)*'
+              f'*(60% of cost + upgrades + {(level-1)*5}% level bonus \u2014 this cannot be undone!)*'
           ),
           color=0xE67E22,
       )
@@ -604,10 +604,7 @@ class BusinessCog(commands.Cog):
 
       embed = discord.Embed(
           title=f"\U0001f3e2 Negocios de {member.display_name}",
-          description=(
-              f"Elige qué negocio visitar. Pagarás la entrada y ""
-              f"**{member.display_name}** recibirá el dinero al instante."
-          ),
+          description=f"Elige qu\u00e9 negocio visitar. **{member.display_name}** recibir\u00e1 la entrada al instante.",
           color=0x3498DB,
       )
       for b in businesses[:8]:
@@ -664,22 +661,13 @@ class BusinessCog(commands.Cog):
           ("/business fire <id> <#>",            "Fire a worker by index"),
           ("/business sell <id>",                "Sell a business for coins"),
           ("/business rename <id> <name>",       "Rename a business"),
-          ("/business visit <member>",           "Visit another player's empire"),
+          ("/business visit <member>",           "Visita el negocio de otro jugador"),
           ("/business leaderboard",              "Top 10 earners globally"),
       ]:
           embed.add_field(name=f"`{cmd}`", value=desc, inline=False)
       embed.set_footer(text="Income accumulates up to 24h. Collect regularly for XP & reputation!")
       await ctx.send(embed=embed)
 
-
-  @business_collect.error
-  async def collect_error(self, ctx: commands.Context, error: Exception):
-      if isinstance(error, commands.CommandOnCooldown):
-          mins = int(error.retry_after // 60)
-          secs = int(error.retry_after % 60)
-          msg  = f"\u23f0 Ya cobraste hace poco! Inténtalo en **{mins}m {secs}s**." if mins else f"\u23f0 Inténtalo en **{secs}s**."
-          return await ctx.send(msg, ephemeral=True)
-      raise error
 
 async def setup(bot: commands.Bot):
   await bot.add_cog(BusinessCog(bot))
