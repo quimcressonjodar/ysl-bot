@@ -199,25 +199,31 @@ def get_user_portfolio(user_id):
 
 
 def buy_stock(user_id, symbol, quantity, price):
+    # Ensure the user document exists
+    user_stocks_col.update_one(
+        {"_id": user_id},
+        {"$setOnInsert": {"stocks": {}}},
+        upsert=True,
+    )
+
+    # Read only the current symbol's data to compute new avg_price
     portfolio = user_stocks_col.find_one({"_id": user_id})
-    if not portfolio:
-        user_stocks_col.insert_one({"_id": user_id, "stocks": {}})
-        portfolio = {"stocks": {}}
+    current = portfolio.get("stocks", {}).get(symbol, {"quantity": 0, "avg_price": 0})
 
-    stocks = portfolio.get("stocks", {})
-    if symbol not in stocks:
-        stocks[symbol] = {"quantity": 0, "avg_price": 0}
-
-    current = stocks[symbol]
-    new_total_cost = (current["quantity"] * current["avg_price"]) + (quantity * price)
     new_quantity = current["quantity"] + quantity
+    new_avg_price = (
+        (current["quantity"] * current["avg_price"]) + (quantity * price)
+    ) / new_quantity
 
-    stocks[symbol] = {
-        "quantity": new_quantity,
-        "avg_price": new_total_cost / new_quantity,
-    }
-
-    user_stocks_col.update_one({"_id": user_id}, {"$set": {"stocks": stocks}})
+    # Use dot-notation $set so ONLY this symbol's fields are written,
+    # leaving every other symbol in the user's portfolio untouched.
+    user_stocks_col.update_one(
+        {"_id": user_id},
+        {"$set": {
+            f"stocks.{symbol}.quantity": new_quantity,
+            f"stocks.{symbol}.avg_price": new_avg_price,
+        }},
+    )
 
 
 def sell_stock(user_id, symbol, quantity):
@@ -225,15 +231,22 @@ def sell_stock(user_id, symbol, quantity):
     if not portfolio or symbol not in portfolio.get("stocks", {}):
         return False
 
-    stocks = portfolio["stocks"]
-    if stocks[symbol]["quantity"] < quantity:
+    current_qty = portfolio["stocks"][symbol]["quantity"]
+    if current_qty < quantity:
         return False
 
-    stocks[symbol]["quantity"] -= quantity
-    if stocks[symbol]["quantity"] == 0:
-        del stocks[symbol]
-
-    user_stocks_col.update_one({"_id": user_id}, {"$set": {"stocks": stocks}})
+    new_qty = current_qty - quantity
+    if new_qty == 0:
+        # Remove the symbol entirely using $unset
+        user_stocks_col.update_one(
+            {"_id": user_id},
+            {"$unset": {f"stocks.{symbol}": ""}},
+        )
+    else:
+        user_stocks_col.update_one(
+            {"_id": user_id},
+            {"$set": {f"stocks.{symbol}.quantity": new_qty}},
+        )
     return True
 
 
