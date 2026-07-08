@@ -179,8 +179,8 @@ def _apply_uwu(text: str) -> str:
         suffix += ' ' + random.choice(TROLL_EMOJIS)
     text = text.rstrip() + suffix
 
-    # 9. Prepend a roleplay action (~30 % of messages)
-    if random.random() < 0.30:
+    # 9. Prepend a roleplay action (~15 % of messages)
+    if random.random() < 0.15:
         text = random.choice(ROLEPLAY_ACTIONS) + ' ' + text
 
     # 10. Fallback — if nothing changed, force a UwU face + emoji so it's always visible
