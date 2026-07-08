@@ -13,6 +13,14 @@ CUTE_REPLACEMENTS = {
     "love": "wuv",
     "what": "wat",
     "the": "da",
+    "that": "dat",
+    "this": "dis",
+    "is": "ish",
+    "are": "awe",
+    "was": "waz",
+    "sad": "saaad",
+    "bad": "baad",
+    "mad": "maaad",
     "hi": "hewwo",
     "hello": "hewwo",
     "ok": "owkay",
@@ -41,6 +49,33 @@ CUTE_REPLACEMENTS = {
     "lmao": "wmaoo",
     "omg": "owmg",
     "wtf": "wtheck",
+    "because": "becuz",
+    "when": "wen",
+    "why": "wai",
+    "how": "howw",
+    "just": "juwst",
+    "but": "buwt",
+    "so": "soo",
+    "not": "nwot",
+    "my": "mwy",
+    "me": "mwe",
+    "its": "itz",
+    "it": "eet",
+    "he": "hee",
+    "she": "shee",
+    "they": "dey",
+    "we": "wee",
+    "do": "doo",
+    "can": "cwan",
+    "will": "wiww",
+    "got": "got >w<",
+    "going": "goinggg",
+    "idk": "idkk uwu",
+    "ngl": "ngl bestie",
+    "fr": "fwr",
+    "bruh": "bwuh",
+    "man": "myan",
+    "guys": "guyyys",
 }
 
 TROLL_EMOJIS = ["🥺", "✨", "😭", "💖", "😳", "🌸", "💕", "🥹", "🫶", "😚", "🐾", "💫"]
@@ -75,6 +110,7 @@ _PROTECT_RE = re.compile(
 
 
 def _apply_uwu(text: str) -> str:
+    original = text
     # 0. Split into protected tokens and normal text so we never mangle
     #    mentions, custom emoji, or URLs.
     parts = []       # list of (is_protected, chunk)
@@ -135,17 +171,21 @@ def _apply_uwu(text: str) -> str:
     if random.random() < 0.25:
         text = re.sub(r'\b([a-zA-Z])([a-zA-Z]{2,})', lambda mo: f'{mo.group(1)}-{mo.group()}', text, count=1)
 
-    # 8. Append a face or emoji at the end (50 % chance each, independently)
+    # 8. Append a face or emoji at the end (85 % face, 55 % emoji, independently)
     suffix = ''
-    if random.random() < 0.50:
+    if random.random() < 0.85:
         suffix += ' ' + random.choice(UWU_FACES)
-    if random.random() < 0.30:
+    if random.random() < 0.55:
         suffix += ' ' + random.choice(TROLL_EMOJIS)
     text = text.rstrip() + suffix
 
-    # 9. Prepend a roleplay action (~15 % of messages)
-    if random.random() < 0.15:
+    # 9. Prepend a roleplay action (~30 % of messages)
+    if random.random() < 0.30:
         text = random.choice(ROLEPLAY_ACTIONS) + ' ' + text
+
+    # 10. Fallback — if nothing changed, force a UwU face + emoji so it's always visible
+    if text.strip() == original.strip():
+        text = text.rstrip() + ' ' + random.choice(UWU_FACES) + ' ' + random.choice(TROLL_EMOJIS)
 
     return text
 
