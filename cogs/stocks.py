@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import time
 import random
-from config import STOCKS, STOCK_UPDATE_INTERVAL, STOCK_FEE
+from config import STOCKS, STOCK_UPDATE_INTERVAL, STOCK_FEE, OWNER_IDS
 from utils.stocks import (
     update_stock_prices, generate_stock_chart, get_current_price,
     get_user_portfolio, buy_stock, sell_stock, process_dividends,
