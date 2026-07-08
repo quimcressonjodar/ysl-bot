@@ -531,7 +531,8 @@ class EconomyCog(commands.Cog):
         if not inventory:
             return await ctx.send("🎒 Your inventory is empty.")
         embed = discord.Embed(title="💰 Sell Item", description="Choose an item to sell.", color=0xE67E22)
-        await ctx.send(embed=embed, view=SellView(ctx, inventory))
+        _sell_view = SellView(ctx, inventory)
+        _sell_view.message = await ctx.send(embed=embed, view=_sell_view)
 
     @commands.hybrid_command(name="inventory", aliases=["inv"], description="View your inventory")
     async def inventory(self, ctx: commands.Context):
