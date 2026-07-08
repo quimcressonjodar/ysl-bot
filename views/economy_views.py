@@ -92,4 +92,12 @@ class SellView(discord.ui.View):
         super().__init__(timeout=60)
         self.ctx = ctx
         self.inventory = inventory
+        self.message: discord.Message | None = None
         self.add_item(SellSelect(ctx, inventory))
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ This menu expired.", view=None, embed=None)
+            except Exception:
+                pass
