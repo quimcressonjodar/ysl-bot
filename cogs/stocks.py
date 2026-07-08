@@ -790,6 +790,12 @@ class Stocks(commands.Cog):
             delete_after=10,
         )
 
+        # Trigger autosell check immediately so orders fire on manual spikes too
+        try:
+            await check_autosells(self.bot)
+        except Exception as e:
+            print(f"[raise] check_autosells error: {e}")
+
 
 async def setup(bot):
     await bot.add_cog(Stocks(bot))

@@ -504,7 +504,12 @@ async def check_autosells(bot):
         profit = int((current_price - avg_price) * sell_qty)
         fee_paid = int(current_price * sell_qty * current_fee)
 
-        sold = sell_stock(user_id, symbol, sell_qty)
+        try:
+            sold = sell_stock(user_id, symbol, sell_qty)
+        except Exception as e:
+            print(f"[autosell] sell_stock error for {user_id} {symbol}: {e}")
+            continue
+
         if sold:
             update_wallet(user_id, total_gain)
 
@@ -538,8 +543,10 @@ async def check_autosells(bot):
                     footer += f" • Fee applied: 🪙 {fee_paid:,}"
                 embed.set_footer(text=footer)
                 await user.send(embed=embed)
-            except Exception:
-                pass  # DMs closed or user not found
+            except Exception as e:
+                print(f"[autosell] DM failed for {user_id}: {e}")
 
             # Only remove the order after a confirmed successful sell
             autosell_col.delete_one({"_id": order["_id"]})
+        else:
+            print(f"[autosell] sell_stock returned False for {user_id} {symbol} qty={sell_qty} owned={owned}")
