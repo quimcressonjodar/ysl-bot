@@ -39,6 +39,14 @@ class BusinessListView(discord.ui.View):
       self.ctx        = ctx
       self.businesses = businesses
       self.page       = 0
+      self.message: discord.Message | None = None
+
+  async def on_timeout(self) -> None:
+      if self.message:
+          try:
+              await self.message.edit(view=None)
+          except Exception:
+              pass
 
   def max_pages(self) -> int:
       return max(1, (len(self.businesses) + self.PER_PAGE - 1) // self.PER_PAGE)
@@ -93,6 +101,14 @@ class SellConfirmView(discord.ui.View):
       self.business_id = business_id
       self.sell_price  = sell_price
       self.name        = name
+      self.message: discord.Message | None = None
+
+  async def on_timeout(self) -> None:
+      if self.message:
+          try:
+              await self.message.edit(content="⏰ This confirmation expired.", view=None, embed=None)
+          except Exception:
+              pass
 
   @discord.ui.button(label="\u2705 Confirm Sale", style=discord.ButtonStyle.danger)
   async def confirm(self, interaction: discord.Interaction, _: discord.ui.Button):
@@ -124,6 +140,14 @@ class HireConfirmView(discord.ui.View):
       self.worker      = worker
       self.hire_cost   = hire_cost
       self._confirmed  = False
+      self.message: discord.Message | None = None
+
+  async def on_timeout(self) -> None:
+      if self.message:
+          try:
+              await self.message.edit(content="⏰ This confirmation expired.", view=None, embed=None)
+          except Exception:
+              pass
 
   @discord.ui.button(label="\u2705 Hire", style=discord.ButtonStyle.green)
   async def confirm(self, interaction: discord.Interaction, _: discord.ui.Button):
@@ -164,6 +188,7 @@ class VisitView(discord.ui.View):
       super().__init__(timeout=60)
       self.ctx   = ctx
       self.owner = owner
+      self.message: discord.Message | None = None
       options = []
       for b in businesses[:25]:
           btype = BUSINESS_TYPES[b["type"]]
@@ -176,29 +201,37 @@ class VisitView(discord.ui.View):
           ))
       self.select.options = options
 
+  async def on_timeout(self) -> None:
+      if self.message:
+          try:
+              await self.message.edit(content="⏰ This visit menu expired.", view=None, embed=None)
+          except Exception:
+              pass
+
   @discord.ui.select(placeholder="Choose a business to visit\u2026", min_values=1, max_values=1)
   async def select(self, interaction: discord.Interaction, sel: discord.ui.Select):
       if str(interaction.user.id) != str(self.ctx.author.id):
           return await interaction.response.send_message("\u274c Not your menu.", ephemeral=True)
+      await interaction.response.defer()
       business_id = sel.values[0]
       b = get_business(business_id)
       if not b:
-          return await interaction.response.send_message("\u274c Business not found.", ephemeral=True)
+          return await interaction.followup.send("\u274c Business not found.", ephemeral=True)
       btype    = BUSINESS_TYPES[b["type"]]
       fee      = btype.get("entry_fee", 0)
       visitor  = str(interaction.user.id)
       owner_id = b["owner_id"]
       if visitor == owner_id:
-          return await interaction.response.send_message("\u274c That is your own business.", ephemeral=True)
+          return await interaction.followup.send("\u274c That is your own business.", ephemeral=True)
       wallet = get_wallet(visitor)
       if wallet < fee:
-          return await interaction.response.send_message(
+          return await interaction.followup.send(
               f"\u274c You need \U0001fa99 **{fee:,}** and you have \U0001fa99 {wallet:,}.",
               ephemeral=True,
           )
       result = visit_business(visitor, business_id)
       if "error" in result:
-          return await interaction.response.send_message(f'\u274c {result["error"]}', ephemeral=True)
+          return await interaction.followup.send(f'\u274c {result["error"]}', ephemeral=True)
 
       # ── Deduct entry fee & pay owner ──────────────────────
       update_wallet(visitor,  -fee)
@@ -254,7 +287,7 @@ class VisitView(discord.ui.View):
           color=0x2ecc71,
       )
       embed.set_footer(text=f"Total visits: {b.get('visits', 0) + 1:,}")
-      await interaction.response.edit_message(embed=embed, view=None)
+      await interaction.edit_original_response(embed=embed, view=None)
 
 
 # ─────────────────────────────────────────────────────────
@@ -341,7 +374,7 @@ class BusinessCog(commands.Cog):
       if not businesses:
           return await ctx.send(f"{pronoun} no businesses yet.", ephemeral=True)
       view = BusinessListView(ctx, businesses)
-      await ctx.send(embed=view.build_embed(), view=view)
+      view.message = await ctx.send(embed=view.build_embed(), view=view)
 
   # ── /business info ────────────────────────────────────
   @business.command(name="info", description="Full stats for a specific business")
@@ -564,7 +597,7 @@ class BusinessCog(commands.Cog):
           color=0x27AE60,
       )
       view = HireConfirmView(ctx, business_id, w, cost)
-      await ctx.send(embed=embed, view=view)
+      view.message = await ctx.send(embed=embed, view=view)
 
   # ── /business fire ────────────────────────────────────
   @business.command(name="fire", description="Fire a worker from one of your businesses")
@@ -613,7 +646,7 @@ class BusinessCog(commands.Cog):
           color=0xE67E22,
       )
       view = SellConfirmView(ctx, business_id, sell_price, b["name"])
-      await ctx.send(embed=embed, view=view)
+      view.message = await ctx.send(embed=embed, view=view)
 
   # ── /business rename ──────────────────────────────────
   @business.command(name="rename", description="Give a business a new name")
@@ -657,7 +690,7 @@ class BusinessCog(commands.Cog):
           )
       embed.set_thumbnail(url=member.display_avatar.url)
       view = VisitView(ctx, member, businesses)
-      await ctx.send(embed=embed, view=view)
+      view.message = await ctx.send(embed=embed, view=view)
 
   # ── /business leaderboard ─────────────────────────────
   @business.command(name="leaderboard", description="Top 10 businesses by total earnings")
