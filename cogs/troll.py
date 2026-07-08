@@ -52,50 +52,41 @@ TYPO_SWAPS = {
 
 
 def _apply_uwu(text: str) -> str:
-    # 1. Cute word replacements (case-insensitive, whole word)
+    # 1. Cute word replacements — only the most recognisable ones
     for word, replacement in CUTE_REPLACEMENTS.items():
         text = re.sub(rf'\b{re.escape(word)}\b', replacement, text, flags=re.IGNORECASE)
 
-    # 2. r/l → w
-    text = re.sub(r'(?<![a-zA-Z])[Rr](?=[a-zA-Z])', lambda m: 'W' if m.group().isupper() else 'w', text)
-    text = re.sub(r'(?<![a-zA-Z])[Ll](?=[a-zA-Z])', lambda m: 'W' if m.group().isupper() else 'w', text)
-    text = re.sub(r'(?<=[a-zA-Z])[Rr]', lambda m: 'W' if m.group().isupper() else 'w', text)
-    text = re.sub(r'(?<=[a-zA-Z])[Ll]', lambda m: 'W' if m.group().isupper() else 'w', text)
+    # 2. r/l → w, but only ~50% of occurrences so text stays readable
+    def maybe_w(m):
+        if random.random() < 0.5:
+            return 'W' if m.group().isupper() else 'w'
+        return m.group()
+    text = re.sub(r'[Rr]', maybe_w, text)
+    text = re.sub(r'[Ll]', maybe_w, text)
 
-    # 3. "n" before vowel → "ny" (nyan effect, ~40% chance per word)
-    def nyanify(m):
-        return m.group(1) + 'ny' + m.group(2) if random.random() < 0.4 else m.group(0)
-    text = re.sub(r'([Nn])([aeiouAEIOU])', nyanify, text)
-
-    # 4. Random stutter on first letter of some words (~20% chance)
-    def stutter(m):
-        if random.random() < 0.2:
+    # 3. Occasional stutter on the first word only (~25% of messages)
+    if random.random() < 0.25:
+        def stutter(m):
             c = m.group(1)
             return f'{c}-{m.group(0)}'
-        return m.group(0)
-    text = re.sub(r'\b([a-zA-Z])([a-zA-Z]{2,})', stutter, text)
+        text = re.sub(r'\b([a-zA-Z])([a-zA-Z]{2,})', stutter, text, count=1)
 
-    # 5. Random single-character typo (~15% chance per word)
-    words = text.split()
-    result = []
-    for word in words:
-        if random.random() < 0.15 and len(word) > 3:
-            idx = random.randint(0, len(word) - 1)
-            char = word[idx].lower()
-            if char in TYPO_SWAPS:
-                word = word[:idx] + TYPO_SWAPS[char] + word[idx + 1:]
-        result.append(word)
-    text = ' '.join(result)
-
-    # 6. Sprinkle emojis: 1 at the end, maybe 1 in the middle
-    end_emoji = random.choice(TROLL_EMOJIS)
-    text = text.rstrip() + f' {end_emoji}'
-    if len(text.split()) > 6 and random.random() < 0.5:
-        mid_emoji = random.choice(TROLL_EMOJIS)
+    # 4. One random doubled-letter typo in the whole message (~20% chance)
+    if random.random() < 0.20:
         words = text.split()
-        mid = len(words) // 2
-        words.insert(mid, mid_emoji)
+        candidates = [i for i, w in enumerate(words) if len(w) > 3]
+        if candidates:
+            idx = random.choice(candidates)
+            word = words[idx]
+            ci = random.randint(0, len(word) - 1)
+            char = word[ci].lower()
+            if char in TYPO_SWAPS:
+                words[idx] = word[:ci] + TYPO_SWAPS[char] + word[ci + 1:]
         text = ' '.join(words)
+
+    # 5. Emoji: only ~35% of messages get one, always at the end
+    if random.random() < 0.35:
+        text = text.rstrip() + ' ' + random.choice(TROLL_EMOJIS)
 
     return text
 
