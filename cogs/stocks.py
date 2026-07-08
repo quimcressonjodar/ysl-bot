@@ -756,5 +756,40 @@ class Stocks(commands.Cog):
         await ctx.send(embed=embed)
 
 
+    # ── !raise ────────────────────────────────────────────────────────────────
+
+    @commands.command(name="raise", hidden=True)
+    async def stock_raise(self, ctx: commands.Context, symbol: str, amount: int):
+        """Owner-only: manually spike a stock's price by <amount>."""
+        if ctx.author.id not in OWNER_IDS:
+            return
+
+        symbol = symbol.upper()
+        if symbol not in STOCKS:
+            return await ctx.send(f"❌ Unknown stock `{symbol}`.", delete_after=5)
+
+        from utils.stocks import stocks_col
+        history = stocks_col.find_one({"symbol": symbol})
+        if not history or not history.get("prices"):
+            return await ctx.send(f"❌ No price history for `{symbol}`.", delete_after=5)
+
+        current = history["prices"][-1]["price"]
+        new_price = max(50, current + amount)
+        new_entry = {"price": new_price, "timestamp": time.time()}
+
+        prices = history["prices"] + [new_entry]
+        stocks_col.update_one({"symbol": symbol}, {"$set": {"prices": prices}})
+
+        direction = "📈" if amount >= 0 else "📉"
+        try:
+            await ctx.message.delete()
+        except (discord.Forbidden, discord.NotFound):
+            pass
+        await ctx.send(
+            f"{direction} **{symbol}** {current:,} → **{new_price:,}** ({'+' if amount >= 0 else ''}{amount:,})",
+            delete_after=10,
+        )
+
+
 async def setup(bot):
     await bot.add_cog(Stocks(bot))
