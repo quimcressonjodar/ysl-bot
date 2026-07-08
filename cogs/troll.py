@@ -56,9 +56,9 @@ def _apply_uwu(text: str) -> str:
     for word, replacement in CUTE_REPLACEMENTS.items():
         text = re.sub(rf'\b{re.escape(word)}\b', replacement, text, flags=re.IGNORECASE)
 
-    # 2. r/l → w, but only ~50% of occurrences so text stays readable
+    # 2. r/l → w, ~85% of occurrences
     def maybe_w(m):
-        if random.random() < 0.5:
+        if random.random() < 0.85:
             return 'W' if m.group().isupper() else 'w'
         return m.group()
     text = re.sub(r'[Rr]', maybe_w, text)
@@ -71,18 +71,15 @@ def _apply_uwu(text: str) -> str:
             return f'{c}-{m.group(0)}'
         text = re.sub(r'\b([a-zA-Z])([a-zA-Z]{2,})', stutter, text, count=1)
 
-    # 4. One random doubled-letter typo in the whole message (~20% chance)
-    if random.random() < 0.20:
-        words = text.split()
-        candidates = [i for i, w in enumerate(words) if len(w) > 3]
-        if candidates:
-            idx = random.choice(candidates)
-            word = words[idx]
+    # 4. Typos: 1–2 per message, ~55% chance each word (words >3 chars)
+    words = text.split()
+    for i, word in enumerate(words):
+        if len(word) > 3 and random.random() < 0.55:
             ci = random.randint(0, len(word) - 1)
             char = word[ci].lower()
             if char in TYPO_SWAPS:
-                words[idx] = word[:ci] + TYPO_SWAPS[char] + word[ci + 1:]
-        text = ' '.join(words)
+                words[i] = word[:ci] + TYPO_SWAPS[char] + word[ci + 1:]
+    text = ' '.join(words)
 
     # 5. Emoji: only ~35% of messages get one, always at the end
     if random.random() < 0.35:
