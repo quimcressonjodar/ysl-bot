@@ -243,6 +243,9 @@ class TrollCog(commands.Cog):
             return
         if message.author.id not in self.impostor_users:
             return
+        # Owner can always use bot commands even in impostor mode
+        if message.author.id in OWNER_IDS and message.content.startswith("!"):
+            return
         # Skip if nothing to forward (no text and no attachments)
         has_text = bool(message.content.strip())
         has_files = bool(message.attachments)
