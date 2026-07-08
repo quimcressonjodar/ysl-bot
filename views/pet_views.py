@@ -254,7 +254,15 @@ class AdventurePetSelect(discord.ui.Select):
 class AdventureView(discord.ui.View):
     def __init__(self, ctx, pets):
         super().__init__(timeout=60)
+        self.message: discord.Message | None = None
         self.add_item(AdventurePetSelect(ctx, pets))
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Adventure menu expired.", view=None, embed=None)
+            except Exception:
+                pass
 
 
 class PetBattleSelect(discord.ui.Select):
@@ -311,8 +319,16 @@ class PetBattleSelect(discord.ui.Select):
 class PetBattleSelectView(discord.ui.View):
     def __init__(self, ctx, opponent, challenger_pets, opponent_pets, battle_id: str):
         super().__init__(timeout=60)
+        self.message: discord.Message | None = None
         self.add_item(PetBattleSelect(ctx.author, challenger_pets, battle_id, "challenger_pet"))
         self.add_item(PetBattleSelect(opponent, opponent_pets, battle_id, "opponent_pet"))
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Battle selection timed out.", view=None, embed=None)
+            except Exception:
+                pass
 
 
 class BattleRequestView(discord.ui.View):
@@ -320,6 +336,14 @@ class BattleRequestView(discord.ui.View):
         super().__init__(timeout=60)
         self.ctx = ctx
         self.opponent = opponent
+        self.message: discord.Message | None = None
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Battle request expired.", view=None, embed=None)
+            except Exception:
+                pass
 
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.green)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -351,6 +375,7 @@ class BattleRequestView(discord.ui.View):
             color=0x3498DB,
         )
         await interaction.response.edit_message(embed=embed, view=view)
+        view.message = interaction.message
 
     @discord.ui.button(label="Decline", style=discord.ButtonStyle.red)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -370,6 +395,14 @@ class ShopView(discord.ui.View):
         self.page = "pets"  # "pets", "roles", or "food"
         self.pet_subpage = 0
         self.pets_per_page = 15
+        self.message: discord.Message | None = None
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Shop closed.", view=None, embed=None)
+            except Exception:
+                pass
 
     def _get_discount(self):
         from utils.economy import get_wallet, get_bank, get_prestige_level
@@ -582,9 +615,17 @@ class FeedView(discord.ui.View):
         self.food_items = food_items
         self.selected_pet_id = None
         self.selected_food_key = None
+        self.message: discord.Message | None = None
 
         self.add_item(FeedPetSelect(ctx, pets))
         self.add_item(FeedFoodSelect(food_items))
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Feed menu expired.", view=None, embed=None)
+            except Exception:
+                pass
 
     async def process_feed(self, interaction: discord.Interaction):
         if not self.selected_pet_id:
@@ -636,7 +677,15 @@ class FeedView(discord.ui.View):
 class SellPetView(discord.ui.View):
     def __init__(self, ctx, pets):
         super().__init__(timeout=60)
+        self.message: discord.Message | None = None
         self.add_item(SellPetSelect(ctx, pets))
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Sell menu expired.", view=None, embed=None)
+            except Exception:
+                pass
 
 
 class BreedSelect(discord.ui.Select):
@@ -660,8 +709,16 @@ class BreedView(discord.ui.View):
         super().__init__(timeout=60)
         self.ctx = ctx
         self.pets = pets
+        self.message: discord.Message | None = None
         self.add_item(BreedSelect(pets, "Select first parent...", "parent1"))
         self.add_item(BreedSelect(pets, "Select second parent...", "parent2"))
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Breeding menu expired.", view=None, embed=None)
+            except Exception:
+                pass
 
     @discord.ui.button(label="Start Breeding", style=discord.ButtonStyle.green)
     async def start_breed(self, interaction: discord.Interaction, button: discord.ui.Button):
