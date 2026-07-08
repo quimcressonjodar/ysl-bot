@@ -22,6 +22,14 @@ class StockView(discord.ui.View):
         super().__init__(timeout=60)
         self.ctx = ctx
         self.symbol = symbol
+        self.message: discord.Message | None = None
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except Exception:
+                pass
 
     @discord.ui.button(label="Buy 1", style=discord.ButtonStyle.green)
     async def buy_one(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -335,10 +343,10 @@ class Stocks(commands.Cog):
             if chart:
                 embed.set_image(url=f"attachment://{symbol}_chart.png")
                 view = StockView(ctx, symbol)
-                await ctx.send(embed=embed, file=chart, view=view)
+                view.message = await ctx.send(embed=embed, file=chart, view=view)
             else:
                 view = StockView(ctx, symbol)
-                await ctx.send(embed=embed, view=view)
+                view.message = await ctx.send(embed=embed, view=view)
         except Exception as e:
             print(f"STOCKS COMMAND ERROR: {e}")
             await ctx.send(f"❌ An error occurred while fetching data for {symbol}. Please try again later.")
