@@ -15,6 +15,14 @@ class BlackjackView(discord.ui.View):
         self.player_hand = [self._draw_card(), self._draw_card()]
         self.dealer_hand = [self._draw_card(), self._draw_card()]
         self.finished = False
+        self.message: discord.Message | None = None
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Game timed out — no action taken.", view=None)
+            except Exception:
+                pass
 
     def _create_deck(self) -> list:
         suits = ['♠️', '♥️', '♦️', '♣️']
@@ -132,6 +140,14 @@ class RPSView(discord.ui.View):
     def __init__(self, player: discord.Member):
         super().__init__(timeout=60)
         self.player = player
+        self.message: discord.Message | None = None
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            try:
+                await self.message.edit(content="⏰ Game timed out.", view=None)
+            except Exception:
+                pass
 
     async def _handle_choice(self, interaction: discord.Interaction, user_choice: str) -> None:
         if interaction.user != self.player:
