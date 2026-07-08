@@ -78,7 +78,11 @@ class PetsCog(commands.Cog):
         if action.lower() == "view":
             view = ShopView(target, PET_SHOP, ROLE_SHOP)
             embed = view._build_embed(guild)
-            return await self._send_response(target, embed=embed, view=view)
+            if isinstance(target, discord.Interaction):
+                await target.response.send_message(embed=embed, view=view)
+            else:
+                view.message = await target.send(embed=embed, view=view)
+            return
 
         if action.lower() == "buy":
             if not pet_name:
@@ -228,7 +232,8 @@ class PetsCog(commands.Cog):
         if not food_items:
             return await ctx.send("❌ You don't have any food in your inventory! Buy some in the `/shop`.")
         
-        await ctx.send("🍖 Select a pet and food to feed:", view=FeedView(ctx, user_pets_data["pets"], food_items))
+        _feed_view = FeedView(ctx, user_pets_data["pets"], food_items)
+        _feed_view.message = await ctx.send("🍖 Select a pet and food to feed:", view=_feed_view)
 
     @commands.hybrid_command(name="battle", description="Battle your pet against another member's pet!")
     async def battle(self, ctx: commands.Context, opponent: discord.Member):
@@ -263,7 +268,7 @@ class PetsCog(commands.Cog):
             color=0xE74C3C,
         )
         view = BattleRequestView(ctx, opponent)
-        await ctx.send(content=opponent.mention, embed=embed, view=view)
+        view.message = await ctx.send(content=opponent.mention, embed=embed, view=view)
 
     @commands.hybrid_command(name="adventures", aliases=["adv"], description="Send your pet on an adventure")
     async def adventures(self, ctx: commands.Context):
@@ -275,7 +280,8 @@ class PetsCog(commands.Cog):
         if all(get_current_hunger(p) < 30 for p in user_pets["pets"]):
             return await ctx.send("😿 Your pet is too weak and needs food before it can participate.")
 
-        await ctx.send("🌍 Choose a pet for the adventure:", view=AdventureView(ctx, user_pets["pets"]))
+        _adv_view = AdventureView(ctx, user_pets["pets"])
+        _adv_view.message = await ctx.send("🌍 Choose a pet for the adventure:", view=_adv_view)
 
     @commands.hybrid_command(name="sell_pet", description="Sell one of your pets for 50% of its shop price")
     async def sell_pet(self, ctx: commands.Context):
@@ -285,7 +291,8 @@ class PetsCog(commands.Cog):
             return await ctx.send("❌ You don't own any pets.")
         
         embed = discord.Embed(title="💰 Sell Pet", description="Choose a pet to sell back to the shop.", color=0xE67E22)
-        await ctx.send(embed=embed, view=SellPetView(ctx, user_pets_data["pets"]))
+        _sell_pet_view = SellPetView(ctx, user_pets_data["pets"])
+        _sell_pet_view.message = await ctx.send(embed=embed, view=_sell_pet_view)
 
     @commands.hybrid_command(name="breed", description="Breed two pets to create a stronger one!")
     async def breed(self, ctx: commands.Context):
@@ -300,7 +307,8 @@ class PetsCog(commands.Cog):
             description="Select two pets to breed. This will cost 25% of their combined value.", 
             color=0xFF69B4
         )
-        await ctx.send(embed=embed, view=BreedView(ctx, user_pets_data["pets"]))
+        _breed_view = BreedView(ctx, user_pets_data["pets"])
+        _breed_view.message = await ctx.send(embed=embed, view=_breed_view)
 
 
 async def setup(bot: commands.Bot):
