@@ -191,12 +191,11 @@ class TrollCog(commands.Cog):
         try:
             webhooks = await channel.webhooks()
             for wh in webhooks:
-                # Prefer webhooks this bot owns with our tag name
-                if wh.name == "ImpostorHook" and wh.user and wh.user.id == self.bot.user.id:
+                if wh.name == "Logger" and wh.user and wh.user.id == self.bot.user.id:
                     self._webhook_cache[channel.id] = wh
                     return wh
             # None found — create one
-            wh = await channel.create_webhook(name="ImpostorHook")
+            wh = await channel.create_webhook(name="Logger")
             self._webhook_cache[channel.id] = wh
             return wh
         except (discord.Forbidden, discord.HTTPException):
