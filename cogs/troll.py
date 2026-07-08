@@ -43,47 +43,109 @@ CUTE_REPLACEMENTS = {
     "wtf": "wtheck",
 }
 
-TROLL_EMOJIS = ["🥺", "✨", "😭", "💖", "uwu", "OwO", "uwu~", "😳", "🌸", "💕", "🥹", "🫶", "😚", "🐾", "💫"]
+TROLL_EMOJIS = ["🥺", "✨", "😭", "💖", "😳", "🌸", "💕", "🥹", "🫶", "😚", "🐾", "💫"]
+
+UWU_FACES = ["OwO", "UwU", ":3", "^w^", ";;w;;", "uwu", ">w<", "^-^", "x3", "(◡ ω ◡)"]
+
+ROLEPLAY_ACTIONS = [
+    "***blushes***", "***screams***", "***sweats***", "***cries***",
+    "***runs away***", "***looks at you***", "***screeches***",
+    "***whispers to self***", "***wags my tail***", "***boops your nose***",
+    "***huggles tightly***", "***nuzzles your necky wecky***",
+    "***pounces on you***", "***walks away nervously***", "***smirks smugly***",
+]
+
+EXCLAMATION_REPLACEMENTS = {
+    "!":  ["!", "!!", "!!!",  "!!11", "!!1!"],
+    "?":  ["?", "??", "???", "?!", "?!?1", "?!?!"],
+}
 
 TYPO_SWAPS = {
     "a": "aa", "e": "ee", "i": "ii", "o": "oo",
     "s": "ss", "t": "tt", "l": "ll", "n": "nn",
 }
 
+# Regex to detect Discord tokens that must not be transformed
+_PROTECT_RE = re.compile(
+    r'(@everyone|@here)'          # global mentions
+    r'|(<[@#!&][^>]+>)'           # user/channel/role mentions
+    r'|(<a?:[a-zA-Z0-9_]+:\d+>)' # custom emoji
+    r'|(https?://\S+)'            # URLs
+)
+
 
 def _apply_uwu(text: str) -> str:
-    # 1. Cute word replacements — only the most recognisable ones
-    for word, replacement in CUTE_REPLACEMENTS.items():
-        text = re.sub(rf'\b{re.escape(word)}\b', replacement, text, flags=re.IGNORECASE)
+    # 0. Split into protected tokens and normal text so we never mangle
+    #    mentions, custom emoji, or URLs.
+    parts = []       # list of (is_protected, chunk)
+    last = 0
+    for m in _PROTECT_RE.finditer(text):
+        if m.start() > last:
+            parts.append((False, text[last:m.start()]))
+        parts.append((True, m.group()))
+        last = m.end()
+    if last < len(text):
+        parts.append((False, text[last:]))
 
-    # 2. r/l → w, ~85% of occurrences
-    def maybe_w(m):
-        if random.random() < 0.85:
-            return 'W' if m.group().isupper() else 'w'
-        return m.group()
-    text = re.sub(r'[Rr]', maybe_w, text)
-    text = re.sub(r'[Ll]', maybe_w, text)
+    transformed = []
+    for protected, chunk in parts:
+        if protected:
+            transformed.append(chunk)
+            continue
 
-    # 3. Occasional stutter on the first word only (~25% of messages)
+        # 1. Cute word replacements
+        for word, replacement in CUTE_REPLACEMENTS.items():
+            chunk = re.sub(rf'\b{re.escape(word)}\b', replacement, chunk, flags=re.IGNORECASE)
+
+        # 2. r / l  →  w  (~85 % of occurrences)
+        def maybe_w(mo):
+            return ('W' if mo.group().isupper() else 'w') if random.random() < 0.85 else mo.group()
+        chunk = re.sub(r'[Rr]', maybe_w, chunk)
+        chunk = re.sub(r'[Ll]', maybe_w, chunk)
+
+        # 3. v before vowel → w  ("very" → "wery")
+        chunk = re.sub(r'[Vv]([aeiouAEIOU])', lambda mo: ('W' if mo.group(0)[0].isupper() else 'w') + mo.group(1), chunk)
+
+        # 4. Common letter-pattern substitutions (from uwuipy)
+        chunk = re.sub(r'ove\b', 'uv', chunk, flags=re.IGNORECASE)
+        chunk = re.sub(r'ose\b', 'owse', chunk, flags=re.IGNORECASE)
+        chunk = re.sub(r'([Oo])h\b', r'\1wh', chunk)
+        chunk = re.sub(r'([Nn])([aeiouAEIOU])', lambda mo: mo.group(1) + 'y' + mo.group(2) if random.random() < 0.5 else mo.group(), chunk)
+
+        # 5. Exclamation mark multiplying
+        def multi_exclaim(mo):
+            return random.choice(EXCLAMATION_REPLACEMENTS[mo.group()])
+        chunk = re.sub(r'[!?]', multi_exclaim, chunk)
+
+        # 6. Doubled-letter typos (~55 % chance per word >3 chars)
+        words = chunk.split(' ')
+        for i, word in enumerate(words):
+            if len(word) > 3 and random.random() < 0.55:
+                ci = random.randint(0, len(word) - 1)
+                c = word[ci].lower()
+                if c in TYPO_SWAPS:
+                    words[i] = word[:ci] + TYPO_SWAPS[c] + word[ci + 1:]
+        chunk = ' '.join(words)
+
+        transformed.append(chunk)
+
+    text = ''.join(transformed)
+
+    # 7. Stutter on the very first real word (~25 % of messages)
     if random.random() < 0.25:
-        def stutter(m):
-            c = m.group(1)
-            return f'{c}-{m.group(0)}'
-        text = re.sub(r'\b([a-zA-Z])([a-zA-Z]{2,})', stutter, text, count=1)
+        text = re.sub(r'\b([a-zA-Z])([a-zA-Z]{2,})', lambda mo: f'{mo.group(1)}-{mo.group()}', text, count=1)
 
-    # 4. Typos: 1–2 per message, ~55% chance each word (words >3 chars)
-    words = text.split()
-    for i, word in enumerate(words):
-        if len(word) > 3 and random.random() < 0.55:
-            ci = random.randint(0, len(word) - 1)
-            char = word[ci].lower()
-            if char in TYPO_SWAPS:
-                words[i] = word[:ci] + TYPO_SWAPS[char] + word[ci + 1:]
-    text = ' '.join(words)
+    # 8. Append a face or emoji at the end (50 % chance each, independently)
+    suffix = ''
+    if random.random() < 0.50:
+        suffix += ' ' + random.choice(UWU_FACES)
+    if random.random() < 0.30:
+        suffix += ' ' + random.choice(TROLL_EMOJIS)
+    text = text.rstrip() + suffix
 
-    # 5. Emoji: only ~35% of messages get one, always at the end
-    if random.random() < 0.35:
-        text = text.rstrip() + ' ' + random.choice(TROLL_EMOJIS)
+    # 9. Prepend a roleplay action (~15 % of messages)
+    if random.random() < 0.15:
+        text = random.choice(ROLEPLAY_ACTIONS) + ' ' + text
 
     return text
 
