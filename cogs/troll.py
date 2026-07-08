@@ -208,6 +208,7 @@ class TrollCog(commands.Cog):
         content: str,
         username: str,
         avatar_url: str,
+        files: list[discord.File] | None = None,
     ) -> bool:
         """Try to send through a webhook; retry once if the cached hook is stale."""
         for attempt in range(2):
@@ -216,15 +217,18 @@ class TrollCog(commands.Cog):
                 return False
             try:
                 await webhook.send(
-                    content=content,
+                    content=content or None,
                     username=username,
                     avatar_url=avatar_url,
+                    files=files or [],
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
                 return True
             except discord.NotFound:
-                # Webhook was deleted externally — invalidate cache and retry
                 self._webhook_cache.pop(channel.id, None)
+                # Re-download files for retry (they've been consumed)
+                if files:
+                    return False
             except discord.HTTPException:
                 return False
         return False
@@ -240,19 +244,26 @@ class TrollCog(commands.Cog):
             return
         if message.author.id not in self.impostor_users:
             return
-        # Skip command messages (let the bot process them normally)
-        if message.content.startswith("!"):
-            return
-        # Skip empty messages (e.g. image-only)
-        if not message.content.strip():
+        # Skip if nothing to forward (no text and no attachments)
+        has_text = bool(message.content.strip())
+        has_files = bool(message.attachments)
+        if not has_text and not has_files:
             return
 
-        transformed = _apply_uwu(message.content)
+        transformed = _apply_uwu(message.content) if has_text else ""
         username = message.author.display_name
         avatar_url = message.author.display_avatar.url
 
+        # Download attachments to re-upload via webhook
+        files: list[discord.File] = []
+        for attachment in message.attachments:
+            try:
+                files.append(await attachment.to_file())
+            except discord.HTTPException:
+                pass
+
         # Send FIRST — only delete original if relay succeeded to avoid data loss
-        sent = await self._send_via_webhook(message.channel, transformed, username, avatar_url)
+        sent = await self._send_via_webhook(message.channel, transformed, username, avatar_url, files)
         if sent:
             try:
                 await message.delete()
