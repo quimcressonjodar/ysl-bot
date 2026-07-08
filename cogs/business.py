@@ -306,6 +306,7 @@ class BusinessCog(commands.Cog):
   # ── /business shop ────────────────────────────────────
   @business.command(name="shop", description="Browse all available business types")
   async def business_shop(self, ctx: commands.Context):
+      await ctx.defer()
       embed = discord.Embed(
           title="\U0001f3ea Business Marketplace",
           description="Use `/business buy <type> [name]` to open one.",
@@ -329,6 +330,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="buy", description="Purchase a new business")
   @app_commands.describe(type="Business type key (e.g. restaurant, cinema, arcade)", name="Custom name (optional)")
   async def business_buy(self, ctx: commands.Context, type: str, *, name: str = ""):
+      await ctx.defer()
       btype_key = type.lower().replace(" ", "").replace("_", "").replace("-", "")
       if btype_key not in BUSINESS_TYPES:
           keys = ", ".join(f"`{k}`" for k in BUSINESS_TYPES)
@@ -368,6 +370,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="list", description="View all businesses you or another player owns")
   @app_commands.describe(member="Player to look up (default: you)")
   async def business_list(self, ctx: commands.Context, member: discord.Member = None):
+      await ctx.defer()
       target     = member or ctx.author
       businesses = get_owner_businesses(str(target.id))
       pronoun    = "You have" if not member else f"{target.display_name} has"
@@ -380,6 +383,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="info", description="Full stats for a specific business")
   @app_commands.describe(business_id="The business ID (see /business list)")
   async def business_info(self, ctx: commands.Context, business_id: str):
+      await ctx.defer()
       b = get_business(business_id)
       if not b:
           return await ctx.send("\u274c Business not found.", ephemeral=True)
@@ -447,6 +451,7 @@ class BusinessCog(commands.Cog):
   @commands.cooldown(1, 1800, commands.BucketType.user)
   @app_commands.describe(business_id="Leave blank to collect from ALL your businesses")
   async def business_collect(self, ctx: commands.Context, business_id: str = None):
+      await ctx.defer()
       user_id = str(ctx.author.id)
       if business_id:
           b = get_business(business_id)
@@ -493,6 +498,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="upgrades", description="View all upgrades for a business")
   @app_commands.describe(business_id="Business ID")
   async def business_upgrades(self, ctx: commands.Context, business_id: str):
+      await ctx.defer()
       b = get_business(business_id)
       if not b:
           return await ctx.send("\u274c Business not found.", ephemeral=True)
@@ -522,6 +528,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="upgrade", description="Purchase an upgrade for one of your businesses")
   @app_commands.describe(business_id="Business ID", upgrade_id="Upgrade key (see /business upgrades)")
   async def business_upgrade(self, ctx: commands.Context, business_id: str, upgrade_id: str):
+      await ctx.defer()
       user_id = str(ctx.author.id)
       b = get_business(business_id)
       if not b:
@@ -561,6 +568,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="hire", description="Hire a random NPC worker for a business")
   @app_commands.describe(business_id="Business ID")
   async def business_hire(self, ctx: commands.Context, business_id: str):
+      await ctx.defer()
       user_id = str(ctx.author.id)
       b = get_business(business_id)
       if not b:
@@ -603,6 +611,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="fire", description="Fire a worker from one of your businesses")
   @app_commands.describe(business_id="Business ID", worker_index="Worker # (see /business info)")
   async def business_fire(self, ctx: commands.Context, business_id: str, worker_index: int):
+      await ctx.defer()
       user_id = str(ctx.author.id)
       b = get_business(business_id)
       if not b:
@@ -623,6 +632,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="sell", description="Sell a business and receive coins")
   @app_commands.describe(business_id="Business ID")
   async def business_sell(self, ctx: commands.Context, business_id: str):
+      await ctx.defer()
       user_id = str(ctx.author.id)
       b = get_business(business_id)
       if not b:
@@ -652,6 +662,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="rename", description="Give a business a new name")
   @app_commands.describe(business_id="Business ID", name="New name (max 40 chars)")
   async def business_rename(self, ctx: commands.Context, business_id: str, *, name: str):
+      await ctx.defer()
       user_id = str(ctx.author.id)
       b = get_business(business_id)
       if not b:
@@ -665,6 +676,7 @@ class BusinessCog(commands.Cog):
   @business.command(name="visit", description="Visit another player's business and pay the entry fee")
   @app_commands.describe(member="The player whose business you want to visit")
   async def business_visit(self, ctx: commands.Context, member: discord.Member):
+      await ctx.defer()
       if member.id == ctx.author.id:
           return await ctx.send("Use `/business list` to see your own businesses.", ephemeral=True)
       businesses = get_owner_businesses(str(member.id))
@@ -695,6 +707,7 @@ class BusinessCog(commands.Cog):
   # ── /business leaderboard ─────────────────────────────
   @business.command(name="leaderboard", description="Top 10 businesses by total earnings")
   async def business_leaderboard(self, ctx: commands.Context):
+      await ctx.defer()
       top    = get_leaderboard(10)
       medals = ["\U0001f947", "\U0001f948", "\U0001f949"]
       embed  = discord.Embed(title="\U0001f3c6 Business Leaderboard", color=0xF1C40F)
@@ -717,6 +730,7 @@ class BusinessCog(commands.Cog):
   # ── /business help ────────────────────────────────────
   @business.command(name="help", description="All business system commands explained")
   async def business_help(self, ctx: commands.Context):
+      await ctx.defer()
       embed = discord.Embed(title="\U0001f4d6 Business System \u2014 Commands", color=0x8E44AD)
       for cmd, desc in [
           ("/business shop",                   "Browse all business types & prices"),
