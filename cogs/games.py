@@ -145,6 +145,7 @@ class GamesCog(commands.Cog):
             return await ctx.send(f"❌ You don't have enough coins. Your balance is 🪙 {user_data['wallet']:,}.")
         view = BlackjackView(ctx, bet)
         msg = await ctx.send(embed=view.create_embed(), view=view)
+        view.message = msg
         
         # Check for natural blackjack
         if view._calculate_score(view.player_hand) == 21:
