@@ -178,13 +178,8 @@ class TrollCog(commands.Cog):
 
         if member.id in self.impostor_users:
             self.impostor_users.discard(member.id)
-            msg = await ctx.send(f"✅ Impostor mode **disabled** for {member.mention}.")
         else:
             self.impostor_users.add(member.id)
-            msg = await ctx.send(f"👻 Impostor mode **enabled** for {member.mention}.")
-
-        # Auto-delete feedback after 5 s
-        await msg.delete(delay=5)
 
     # ── Webhook helper ─────────────────────────────────────────────────────────
 
