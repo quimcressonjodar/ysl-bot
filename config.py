@@ -18,13 +18,14 @@ OWNER_IDS = {1436417791615045785}
 IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}
 
 # ── Horse race (multiplayer betting) ────────────────────────────────────────
-HORSE_NAMES = ["Thunder", "Lightning", "Blaze", "Shadow", "Windstorm"]
+# Horses are named after their color, matching HORSE_COLORS 1-to-1.
+HORSE_NAMES = ["Red", "Blue", "Green", "Yellow", "Purple"]
 HORSE_COLORS = [
-    (231, 76, 60),   # rojo
-    (52, 152, 219),  # azul
-    (46, 204, 113),  # verde
-    (241, 196, 15),  # amarillo
-    (155, 89, 182),  # morado
+    (231, 76, 60),   # red
+    (52, 152, 219),  # blue
+    (46, 204, 113),  # green
+    (241, 196, 15),  # yellow
+    (155, 89, 182),  # purple
 ]
 HORSERACE_BETTING_SECONDS = 30
 HORSERACE_MIN_BETTORS = 2

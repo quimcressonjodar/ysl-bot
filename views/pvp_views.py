@@ -125,11 +125,21 @@ class BlackjackPvPView(discord.ui.View):
 
     async def on_timeout(self) -> None:
         if self.message and not self.finished:
-            update_wallet(str(self.players[0].id), self.bet)
-            update_wallet(str(self.players[1].id), self.bet)
+            self.finished = True
+            # the player whose turn it was gets nothing back — refusing to
+            # play out a losing hand forfeits the whole pot to the opponent.
+            loser = self.current_player
+            winner = self.players[1] if loser.id == self.players[0].id else self.players[0]
+            pot = self.bet * 2
+            update_wallet(str(winner.id), pot)
             try:
                 await self.message.edit(
-                    content="⏰ Duel cancelled due to inactivity — bets refunded.", view=None
+                    content=(
+                        f"⏰ {loser.mention} didn't play their turn in time and forfeits the duel. "
+                        f"🏆 {winner.mention} wins 🪙 {pot:,}!"
+                    ),
+                    embed=self.create_embed(f"{loser.display_name} forfeited"),
+                    view=None,
                 )
             except Exception:
                 pass
@@ -177,6 +187,8 @@ class BlackjackPvPView(discord.ui.View):
         )
 
     async def _settle(self, interaction: discord.Interaction):
+        if self.finished:
+            return
         self.finished = True
         for child in self.children:
             child.disabled = True
@@ -207,6 +219,8 @@ class BlackjackPvPView(discord.ui.View):
         await interaction.response.edit_message(embed=embed, view=self)
 
     async def _handle_hit(self, interaction: discord.Interaction):
+        if self.finished:
+            return await interaction.response.send_message("❌ This duel has already ended.", ephemeral=True)
         if interaction.user.id != self.current_player.id:
             return await interaction.response.send_message("❌ It's not your turn.", ephemeral=True)
 
@@ -225,6 +239,8 @@ class BlackjackPvPView(discord.ui.View):
             )
 
     async def _handle_stand(self, interaction: discord.Interaction):
+        if self.finished:
+            return await interaction.response.send_message("❌ This duel has already ended.", ephemeral=True)
         if interaction.user.id != self.current_player.id:
             return await interaction.response.send_message("❌ It's not your turn.", ephemeral=True)
         self.standing.add(interaction.user.id)

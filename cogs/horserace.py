@@ -1,5 +1,4 @@
 import asyncio
-import random
 import secrets
 import time
 
@@ -14,7 +13,7 @@ from config import (
     HORSERACE_DISTANCE,
 )
 from utils.economy import get_user_data, update_wallet, parse_economy_amount, apply_amortization
-from utils.race_gif import generate_race_gif
+from utils.race_gif import generate_race_gif, generate_result_image, FRAME_MS, LAST_FRAME_MS
 
 
 class RaceSession:
@@ -149,11 +148,19 @@ class HorseRaceCog(commands.Cog):
         rng = secrets.SystemRandom()
         winner_idx = None
         max_ticks = 30
+        lead_changes = []  # (tick, from_idx | None, to_idx)
+        current_leader = None
 
-        for _ in range(max_ticks):
+        for tick in range(max_ticks):
             for i in range(len(positions)):
                 positions[i] += rng.randint(3, 9)
             history.append(positions.copy())
+
+            leader = max(range(len(positions)), key=lambda i: positions[i])
+            if leader != current_leader:
+                lead_changes.append((tick + 1, current_leader, leader))
+                current_leader = leader
+
             if any(p >= HORSERACE_DISTANCE for p in positions):
                 break
 
@@ -163,8 +170,35 @@ class HorseRaceCog(commands.Cog):
         else:
             winner_idx = max(range(len(positions)), key=lambda i: positions[i])
 
+        # 1) Announce the race is starting
+        runners = ", ".join(HORSE_NAMES[:-1]) + f" and {HORSE_NAMES[-1]}"
+        await ctx.send(f"🏇 **Racing...** {runners} are off! 🚩")
+
+        # 2) Send the animated race GIF
         gif_buffer = generate_race_gif(history, HORSERACE_DISTANCE, winner_idx)
         gif_file = discord.File(gif_buffer, filename="race.gif")
+        gif_embed = discord.Embed(title="🏇 Live Race", color=0x2ECC71)
+        gif_embed.set_image(url="attachment://race.gif")
+        await ctx.send(embed=gif_embed, file=gif_file)
+
+        # let the GIF actually play out before revealing the result
+        gif_duration_s = ((len(history) - 1) * FRAME_MS + LAST_FRAME_MS) / 1000
+        await asyncio.sleep(min(gif_duration_s, 8.0))
+
+        # build exciting play-by-play commentary from the lead changes
+        sorted_final = sorted(range(len(positions)), key=lambda i: positions[i], reverse=True)
+        margin = positions[sorted_final[0]] - positions[sorted_final[1]] if len(sorted_final) > 1 else 999
+        commentary = []
+        real_changes = [c for c in lead_changes if c[1] is not None]
+        if len(real_changes) >= 3:
+            commentary.append("🔥 What a back-and-forth battle for the lead!")
+        elif len(real_changes) >= 1:
+            last_change = real_changes[-1]
+            commentary.append(f"⚡ **{HORSE_NAMES[last_change[2]]}** surges ahead late in the race!")
+        if margin <= 4:
+            commentary.append("📸 A photo finish — it came down to the wire!")
+        elif margin >= 20:
+            commentary.append(f"🚀 **{HORSE_NAMES[winner_idx]}** dominates, crossing the line way ahead of the pack!")
 
         pot = sum(bet["amount"] for bet in bets_snapshot.values())
         winners = {uid: b for uid, b in bets_snapshot.items() if b["horse"] == winner_idx}
@@ -199,15 +233,24 @@ class HorseRaceCog(commands.Cog):
             for user_id in bets_snapshot:
                 result_lines.append(f"💀 <@{user_id}> loses their bet")
 
+        result_image = generate_result_image(positions, HORSERACE_DISTANCE, winner_idx)
+        result_file = discord.File(result_image, filename="result.png")
+
+        description_parts = []
+        if commentary:
+            description_parts.append("\n".join(commentary))
+            description_parts.append("")
+        description_parts.append("\n".join(result_lines))
+
         embed = discord.Embed(
             title=f"🏁 {HORSE_NAMES[winner_idx]} wins the race!",
-            description="\n".join(result_lines),
+            description="\n".join(description_parts),
             color=0xF1C40F,
         )
-        embed.set_image(url="attachment://race.gif")
+        embed.set_image(url="attachment://result.png")
         embed.set_footer(text=f"Total pot: 🪙 {pot:,}")
 
-        await ctx.send(embed=embed, file=gif_file)
+        await ctx.send(embed=embed, file=result_file)
 
 
 async def setup(bot: commands.Bot):
