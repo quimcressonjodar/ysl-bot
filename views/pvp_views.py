@@ -49,17 +49,17 @@ class BlackjackChallengeView(discord.ui.View):
         if self.message and not self.responded:
             try:
                 await self.message.edit(
-                    content=f"⏰ {self.opponent.mention} no respondió al duelo a tiempo.", view=None
+                    content=f"⏰ {self.opponent.mention} didn't respond to the duel in time.", view=None
                 )
             except Exception:
                 pass
 
-    @discord.ui.button(label="Aceptar duelo", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="Accept duel", style=discord.ButtonStyle.green)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.opponent.id:
-            return await interaction.response.send_message("❌ Este duelo no es para ti.", ephemeral=True)
+            return await interaction.response.send_message("❌ This duel isn't for you.", ephemeral=True)
         if self.responded:
-            return await interaction.response.send_message("❌ Este duelo ya fue respondido.", ephemeral=True)
+            return await interaction.response.send_message("❌ This duel has already been answered.", ephemeral=True)
 
         from utils.economy import get_user_data
         challenger_data = get_user_data(str(self.challenger.id))
@@ -70,13 +70,13 @@ class BlackjackChallengeView(discord.ui.View):
             for child in self.children:
                 child.disabled = True
             await interaction.response.edit_message(
-                content=f"❌ {self.challenger.mention} ya no tiene suficientes monedas para el duelo.", view=self
+                content=f"❌ {self.challenger.mention} no longer has enough coins for this duel.", view=self
             )
             return
 
         if opponent_data["wallet"] < self.bet:
             return await interaction.response.send_message(
-                f"❌ No tienes suficientes monedas. Tu saldo es 🪙 {opponent_data['wallet']:,}.", ephemeral=True
+                f"❌ You don't have enough coins. Your balance is 🪙 {opponent_data['wallet']:,}.", ephemeral=True
             )
 
         self.responded = True
@@ -87,21 +87,21 @@ class BlackjackChallengeView(discord.ui.View):
             child.disabled = True
 
         game_view = BlackjackPvPView(self.challenger, self.opponent, self.bet)
-        embed = game_view.create_embed(f"Turno de {self.challenger.display_name}")
+        embed = game_view.create_embed(f"{self.challenger.display_name}'s turn")
         await interaction.response.edit_message(content=None, embed=embed, view=game_view)
         game_view.message = interaction.message
 
-    @discord.ui.button(label="Rechazar", style=discord.ButtonStyle.red)
+    @discord.ui.button(label="Decline", style=discord.ButtonStyle.red)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.opponent.id:
-            return await interaction.response.send_message("❌ Este duelo no es para ti.", ephemeral=True)
+            return await interaction.response.send_message("❌ This duel isn't for you.", ephemeral=True)
         if self.responded:
-            return await interaction.response.send_message("❌ Este duelo ya fue respondido.", ephemeral=True)
+            return await interaction.response.send_message("❌ This duel has already been answered.", ephemeral=True)
         self.responded = True
         for child in self.children:
             child.disabled = True
         await interaction.response.edit_message(
-            content=f"🚫 {self.opponent.mention} rechazó el duelo de {self.challenger.mention}.", view=self
+            content=f"🚫 {self.opponent.mention} declined {self.challenger.mention}'s duel.", view=self
         )
 
 
@@ -129,7 +129,7 @@ class BlackjackPvPView(discord.ui.View):
             update_wallet(str(self.players[1].id), self.bet)
             try:
                 await self.message.edit(
-                    content="⏰ Duelo cancelado por inactividad — apuestas reembolsadas.", view=None
+                    content="⏰ Duel cancelled due to inactivity — bets refunded.", view=None
                 )
             except Exception:
                 pass
@@ -147,13 +147,13 @@ class BlackjackPvPView(discord.ui.View):
             if player.id in self.busted:
                 tag = " 💥 Bust"
             elif player.id in self.standing:
-                tag = " ✋ Plantado"
+                tag = " ✋ Standing"
             embed.add_field(
                 name=f"{player.display_name} ({score}){tag}",
                 value=_format_hand(hand),
                 inline=True,
             )
-        embed.set_footer(text=f"Apuesta: 🪙 {self.bet} cada uno | {status}")
+        embed.set_footer(text=f"Bet: 🪙 {self.bet} each | {status}")
         return embed
 
     def _both_done(self) -> bool:
@@ -173,7 +173,7 @@ class BlackjackPvPView(discord.ui.View):
             self.turn = 1 - self.turn
 
         await interaction.response.edit_message(
-            embed=self.create_embed(f"Turno de {self.current_player.display_name}"), view=self
+            embed=self.create_embed(f"{self.current_player.display_name}'s turn"), view=self
         )
 
     async def _settle(self, interaction: discord.Interaction):
@@ -189,17 +189,17 @@ class BlackjackPvPView(discord.ui.View):
 
         pot = self.bet * 2
         if a_bust and b_bust:
-            result = "💥 ¡Ambos se pasaron de 21! Empate — apuestas devueltas."
+            result = "💥 Both busted! It's a draw — bets refunded."
             update_wallet(str(a.id), self.bet)
             update_wallet(str(b.id), self.bet)
         elif a_bust or (not b_bust and score_b > score_a):
             update_wallet(str(b.id), pot)
-            result = f"🏆 {b.display_name} gana 🪙 {pot:,}"
+            result = f"🏆 {b.display_name} wins 🪙 {pot:,}"
         elif b_bust or (not a_bust and score_a > score_b):
             update_wallet(str(a.id), pot)
-            result = f"🏆 {a.display_name} gana 🪙 {pot:,}"
+            result = f"🏆 {a.display_name} wins 🪙 {pot:,}"
         else:
-            result = "🤝 Empate — apuestas devueltas."
+            result = "🤝 It's a draw — bets refunded."
             update_wallet(str(a.id), self.bet)
             update_wallet(str(b.id), self.bet)
 
@@ -208,7 +208,7 @@ class BlackjackPvPView(discord.ui.View):
 
     async def _handle_hit(self, interaction: discord.Interaction):
         if interaction.user.id != self.current_player.id:
-            return await interaction.response.send_message("❌ No es tu turno.", ephemeral=True)
+            return await interaction.response.send_message("❌ It's not your turn.", ephemeral=True)
 
         player_id = interaction.user.id
         self.hands[player_id].append(self._draw())
@@ -221,12 +221,12 @@ class BlackjackPvPView(discord.ui.View):
             await self._advance_or_finish(interaction)
         else:
             await interaction.response.edit_message(
-                embed=self.create_embed(f"Turno de {self.current_player.display_name}"), view=self
+                embed=self.create_embed(f"{self.current_player.display_name}'s turn"), view=self
             )
 
     async def _handle_stand(self, interaction: discord.Interaction):
         if interaction.user.id != self.current_player.id:
-            return await interaction.response.send_message("❌ No es tu turno.", ephemeral=True)
+            return await interaction.response.send_message("❌ It's not your turn.", ephemeral=True)
         self.standing.add(interaction.user.id)
         await self._advance_or_finish(interaction)
 

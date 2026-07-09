@@ -18,7 +18,7 @@ OWNER_IDS = {1436417791615045785}
 IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}
 
 # ── Horse race (multiplayer betting) ────────────────────────────────────────
-HORSE_NAMES = ["Trueno", "Relámpago", "Fuego", "Sombra", "Viento"]
+HORSE_NAMES = ["Thunder", "Lightning", "Blaze", "Shadow", "Windstorm"]
 HORSE_COLORS = [
     (231, 76, 60),   # rojo
     (52, 152, 219),  # azul

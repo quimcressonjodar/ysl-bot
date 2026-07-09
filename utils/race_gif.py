@@ -47,7 +47,7 @@ def _draw_frame(positions: list[int], distance: int, winner_idx: int | None) -> 
     )
     for y in range(TRACK_TOP, bottom_y, 12):
         draw.rectangle([TRACK_RIGHT - 4, y, TRACK_RIGHT + 4, y + 6], fill=(0, 0, 0))
-    draw.text((TRACK_RIGHT - 18, 6), "META", font=small_font, fill=(255, 255, 255))
+    draw.text((TRACK_RIGHT - 18, 6), "FINISH", font=small_font, fill=(255, 255, 255))
 
     track_width = TRACK_RIGHT - TRACK_LEFT
     for i, pos in enumerate(positions):

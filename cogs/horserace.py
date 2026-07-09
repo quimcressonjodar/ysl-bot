@@ -38,7 +38,7 @@ class HorseRaceCog(commands.Cog):
 
     def _bets_text(self, session: RaceSession) -> str:
         if not session.bets:
-            return "_Nadie ha apostado todavía._"
+            return "_No bets placed yet._"
         lines = []
         for user_id, bet in session.bets.items():
             lines.append(f"<@{user_id}> → **{HORSE_NAMES[bet['horse']]}** (🪙 {bet['amount']:,})")
@@ -47,73 +47,73 @@ class HorseRaceCog(commands.Cog):
     def _build_embed(self, session: RaceSession, status: str) -> discord.Embed:
         remaining = max(0, int(session.end_time - time.time()))
         embed = discord.Embed(
-            title="🏇 Carrera de Caballos",
+            title="🏇 Horse Race",
             description=(
                 f"{self._horse_list_text()}\n\n"
-                f"Apuesta con `!horserace bet <caballo 1-5> <cantidad>`\n"
-                f"⏳ Cierre de apuestas: <t:{int(session.end_time)}:R>\n\n"
-                f"**Apuestas actuales:**\n{self._bets_text(session)}"
+                f"Bet with `!horserace bet <horse 1-5> <amount>`\n"
+                f"⏳ Betting closes: <t:{int(session.end_time)}:R>\n\n"
+                f"**Current bets:**\n{self._bets_text(session)}"
             ),
             color=0x2ECC71,
         )
         embed.set_footer(text=status)
         return embed
 
-    @commands.hybrid_group(name="horserace", description="Carrera de caballos multijugador")
+    @commands.hybrid_group(name="horserace", description="Multiplayer horse race betting game")
     async def horserace(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await self.start(ctx)
 
-    @horserace.command(name="start", description="Inicia una carrera de caballos con apuestas")
+    @horserace.command(name="start", description="Start a horse race with betting")
     async def start(self, ctx: commands.Context):
         if ctx.channel.id in self.active_races:
-            return await ctx.send("⚠️ Ya hay una carrera en curso en este canal.")
+            return await ctx.send("⚠️ There's already a race running in this channel.")
 
         session = RaceSession(ctx.channel.id, ctx.author.id)
         self.active_races[ctx.channel.id] = session
 
-        embed = self._build_embed(session, "Fase de apuestas abierta")
+        embed = self._build_embed(session, "Betting is open")
         session.message = await ctx.send(embed=embed)
 
         asyncio.create_task(self._run_race_after_delay(ctx, session))
 
-    @horserace.command(name="bet", description="Apuesta en la carrera activa")
-    @app_commands.describe(horse="Número del caballo (1-5)", amount="Cantidad ('all', 'half' o número)")
+    @horserace.command(name="bet", description="Place a bet on the active race")
+    @app_commands.describe(horse="Horse number (1-5)", amount="Amount ('all', 'half', or a number)")
     async def bet(self, ctx: commands.Context, horse: int, amount: str):
         session = self.active_races.get(ctx.channel.id)
         if session is None or session.resolved:
-            return await ctx.send("❌ No hay ninguna carrera activa en este canal. Usa `!horserace start`.", ephemeral=True)
+            return await ctx.send("❌ There's no active race in this channel. Use `!horserace start`.", ephemeral=True)
 
         if time.time() >= session.end_time:
-            return await ctx.send("❌ Las apuestas ya están cerradas para esta carrera.", ephemeral=True)
+            return await ctx.send("❌ Betting is already closed for this race.", ephemeral=True)
 
         if horse < 1 or horse > len(HORSE_NAMES):
-            return await ctx.send(f"❌ Elige un caballo entre 1 y {len(HORSE_NAMES)}.", ephemeral=True)
+            return await ctx.send(f"❌ Choose a horse between 1 and {len(HORSE_NAMES)}.", ephemeral=True)
 
         user_id = str(ctx.author.id)
 
         async with session.lock:
             if user_id in session.bets:
-                return await ctx.send("❌ Ya has apostado en esta carrera.", ephemeral=True)
+                return await ctx.send("❌ You've already placed a bet on this race.", ephemeral=True)
 
             user_data = get_user_data(user_id)
             bet_amount = parse_economy_amount(amount, user_data["wallet"])
 
             if bet_amount <= 0:
-                return await ctx.send("❌ Apuesta inválida. Usa un número positivo, 'all' o 'half'.", ephemeral=True)
+                return await ctx.send("❌ Invalid bet. Please specify a positive number, 'all', or 'half'.", ephemeral=True)
             if user_data["wallet"] < bet_amount:
-                return await ctx.send(f"❌ No tienes suficientes monedas. Tu saldo es 🪙 {user_data['wallet']:,}.", ephemeral=True)
+                return await ctx.send(f"❌ You don't have enough coins. Your balance is 🪙 {user_data['wallet']:,}.", ephemeral=True)
 
             update_wallet(user_id, -bet_amount)
             session.bets[user_id] = {"horse": horse - 1, "amount": bet_amount}
 
         try:
-            await session.message.edit(embed=self._build_embed(session, "Fase de apuestas abierta"))
+            await session.message.edit(embed=self._build_embed(session, "Betting is open"))
         except (discord.NotFound, discord.HTTPException):
             pass
 
         await ctx.send(
-            f"✅ {ctx.author.mention} apuesta 🪙 {bet_amount:,} a **{HORSE_NAMES[horse - 1]}**.",
+            f"✅ {ctx.author.mention} bets 🪙 {bet_amount:,} on **{HORSE_NAMES[horse - 1]}**.",
             ephemeral=True,
         )
 
@@ -135,10 +135,10 @@ class HorseRaceCog(commands.Cog):
             for user_id, bet in bets_snapshot.items():
                 update_wallet(user_id, bet["amount"])
             embed = discord.Embed(
-                title="🏇 Carrera cancelada",
+                title="🏇 Race cancelled",
                 description=(
-                    f"Se necesitan al menos {HORSERACE_MIN_BETTORS} jugadores distintos apostando.\n"
-                    "Todas las apuestas han sido reembolsadas."
+                    f"At least {HORSERACE_MIN_BETTORS} different players need to bet.\n"
+                    "All bets have been refunded."
                 ),
                 color=0xE74C3C,
             )
@@ -187,25 +187,25 @@ class HorseRaceCog(commands.Cog):
             for user_id, payout in payouts.items():
                 actual_payout = apply_amortization(user_id, payout)
                 update_wallet(user_id, actual_payout)
-                line = f"🏆 <@{user_id}> gana 🪙 {payout:,}"
+                line = f"🏆 <@{user_id}> wins 🪙 {payout:,}"
                 if actual_payout < payout:
-                    line += f" (🪙 {payout - actual_payout:,} usado para pagar deuda)"
+                    line += f" (🪙 {payout - actual_payout:,} used to pay off debt)"
                 result_lines.append(line)
             for user_id in bets_snapshot:
                 if user_id not in winners:
-                    result_lines.append(f"💀 <@{user_id}> pierde su apuesta")
+                    result_lines.append(f"💀 <@{user_id}> loses their bet")
         else:
-            result_lines.append("💀 Nadie apostó al ganador — la casa se queda con el bote.")
+            result_lines.append("💀 Nobody bet on the winner — the house keeps the pot.")
             for user_id in bets_snapshot:
-                result_lines.append(f"💀 <@{user_id}> pierde su apuesta")
+                result_lines.append(f"💀 <@{user_id}> loses their bet")
 
         embed = discord.Embed(
-            title=f"🏁 ¡{HORSE_NAMES[winner_idx]} gana la carrera!",
+            title=f"🏁 {HORSE_NAMES[winner_idx]} wins the race!",
             description="\n".join(result_lines),
             color=0xF1C40F,
         )
         embed.set_image(url="attachment://race.gif")
-        embed.set_footer(text=f"Bote total: 🪙 {pot:,}")
+        embed.set_footer(text=f"Total pot: 🪙 {pot:,}")
 
         await ctx.send(embed=embed, file=gif_file)
 

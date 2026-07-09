@@ -181,31 +181,31 @@ class GamesCog(commands.Cog):
             else:
                 await msg.edit(embed=embed, view=view)
 
-    @commands.hybrid_command(name="bjpvp", aliases=["blackjackpvp"], description="Reta a otro jugador a un duelo de blackjack (Jugador vs Jugador)")
-    @app_commands.describe(opponent="El jugador al que retas", bet_amount="Cantidad ('all', 'half' o número)")
+    @commands.hybrid_command(name="bjpvp", aliases=["blackjackpvp"], description="Challenge another player to a Blackjack duel (Player vs Player)")
+    @app_commands.describe(opponent="The player you're challenging", bet_amount="Amount ('all', 'half', or a number)")
     async def blackjack_pvp(self, ctx: commands.Context, opponent: discord.Member, bet_amount: str):
         challenger_id = str(ctx.author.id)
 
         if opponent.id == ctx.author.id:
-            return await ctx.send("❌ No puedes retarte a ti mismo.", ephemeral=True)
+            return await ctx.send("❌ You can't challenge yourself.", ephemeral=True)
         if opponent.bot:
-            return await ctx.send("❌ No puedes retar a un bot.", ephemeral=True)
+            return await ctx.send("❌ You can't challenge a bot.", ephemeral=True)
 
         challenger_data = get_user_data(challenger_id)
         bet = parse_economy_amount(bet_amount, challenger_data["wallet"])
 
         if bet <= 0:
-            return await ctx.send("❌ Apuesta inválida. Usa un número positivo, 'all' o 'half'.", ephemeral=True)
+            return await ctx.send("❌ Invalid bet. Please specify a positive number, 'all', or 'half'.", ephemeral=True)
         if challenger_data["wallet"] < bet:
-            return await ctx.send(f"❌ No tienes suficientes monedas. Tu saldo es 🪙 {challenger_data['wallet']:,}.", ephemeral=True)
+            return await ctx.send(f"❌ You don't have enough coins. Your balance is 🪙 {challenger_data['wallet']:,}.", ephemeral=True)
 
         opponent_data = get_user_data(str(opponent.id))
         if opponent_data["wallet"] < bet:
-            return await ctx.send(f"❌ {opponent.mention} no tiene suficientes monedas para esta apuesta.", ephemeral=True)
+            return await ctx.send(f"❌ {opponent.mention} doesn't have enough coins for this bet.", ephemeral=True)
 
         view = BlackjackChallengeView(ctx.author, opponent, bet)
         msg = await ctx.send(
-            f"🃏 {opponent.mention}, {ctx.author.mention} te reta a un duelo de blackjack por 🪙 {bet:,}. ¿Aceptas?",
+            f"🃏 {opponent.mention}, {ctx.author.mention} challenges you to a Blackjack duel for 🪙 {bet:,}. Do you accept?",
             view=view,
         )
         view.message = msg
