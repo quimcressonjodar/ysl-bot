@@ -27,9 +27,9 @@ HORSE_COLORS = [
     (241, 196, 15),  # yellow
     (155, 89, 182),  # purple
 ]
-HORSERACE_BETTING_SECONDS = 30
+HORSERACE_BETTING_SECONDS = 45
 HORSERACE_MIN_BETTORS = 2
-HORSERACE_DISTANCE = 100
+HORSERACE_DISTANCE = 220
 
 ROULETTE_RED = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
 VALID_BETS = {"red", "black", "even", "odd", "specific_number", "1st", "2nd", "3rd"}

@@ -44,7 +44,6 @@ class HorseRaceCog(commands.Cog):
         return "\n".join(lines)
 
     def _build_embed(self, session: RaceSession, status: str) -> discord.Embed:
-        remaining = max(0, int(session.end_time - time.time()))
         embed = discord.Embed(
             title="🏇 Horse Race",
             description=(
@@ -147,13 +146,25 @@ class HorseRaceCog(commands.Cog):
         history = [positions.copy()]
         rng = secrets.SystemRandom()
         winner_idx = None
-        max_ticks = 30
+        max_ticks = 60
         lead_changes = []  # (tick, from_idx | None, to_idx)
         current_leader = None
 
+        # each horse gets its own random pace profile for the race, so they
+        # actually feel different instead of all moving at the same speed
+        base_speed = [rng.uniform(3.5, 6.5) for _ in positions]
+        variance = [rng.uniform(1.5, 4.0) for _ in positions]
+
         for tick in range(max_ticks):
             for i in range(len(positions)):
-                positions[i] += rng.randint(3, 9)
+                # occasional bursts/lulls on top of each horse's base pace
+                burst = rng.uniform(-variance[i], variance[i])
+                if rng.random() < 0.12:
+                    burst += rng.uniform(2, 6)  # surge
+                elif rng.random() < 0.12:
+                    burst -= rng.uniform(1, 4)  # stumble
+                step = max(1, round(base_speed[i] + burst))
+                positions[i] += step
             history.append(positions.copy())
 
             leader = max(range(len(positions)), key=lambda i: positions[i])
@@ -183,7 +194,7 @@ class HorseRaceCog(commands.Cog):
 
         # let the GIF actually play out before revealing the result
         gif_duration_s = ((len(history) - 1) * FRAME_MS + LAST_FRAME_MS) / 1000
-        await asyncio.sleep(min(gif_duration_s, 8.0))
+        await asyncio.sleep(min(gif_duration_s, 16.0))
 
         # build exciting play-by-play commentary from the lead changes
         sorted_final = sorted(range(len(positions)), key=lambda i: positions[i], reverse=True)

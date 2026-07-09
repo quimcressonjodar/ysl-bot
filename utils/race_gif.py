@@ -32,6 +32,49 @@ def _darken(color, amount=40):
     return tuple(max(0, c - amount) for c in color)
 
 
+def _draw_crown(draw: ImageDraw.ImageDraw, cx: int, top_y: int):
+    """Hand-drawn gold crown icon (emoji glyphs render as tofu boxes with PIL fonts)."""
+    gold = (255, 215, 0)
+    w, h = 16, 10
+    base = [(cx - w // 2, top_y + h), (cx + w // 2, top_y + h), (cx + w // 2, top_y + h + 4), (cx - w // 2, top_y + h + 4)]
+    draw.polygon(base, fill=gold)
+    points = [
+        (cx - w // 2, top_y + h),
+        (cx - w // 2, top_y + 2),
+        (cx - w // 4, top_y + h - 2),
+        (cx, top_y),
+        (cx + w // 4, top_y + h - 2),
+        (cx + w // 2, top_y + 2),
+        (cx + w // 2, top_y + h),
+    ]
+    draw.polygon(points, fill=gold)
+    for px, py in [(cx - w // 2, top_y + 2), (cx, top_y), (cx + w // 2, top_y + 2)]:
+        draw.ellipse([px - 2, py - 2, px + 2, py + 2], fill=(220, 30, 40))
+
+
+def _draw_trophy(draw: ImageDraw.ImageDraw, cx: int, top_y: int):
+    """Hand-drawn gold trophy icon for the winning horse."""
+    gold = (255, 215, 0)
+    cup_w = 14
+    draw.rectangle([cx - 2, top_y + 10, cx + 2, top_y + 14], fill=gold)
+    draw.rectangle([cx - 6, top_y + 14, cx + 6, top_y + 17], fill=gold)
+    draw.pieslice([cx - cup_w // 2, top_y, cx + cup_w // 2, top_y + 14], 0, 180, fill=gold)
+    draw.arc([cx - cup_w // 2 - 5, top_y, cx - cup_w // 2 + 3, top_y + 10], 90, 270, fill=gold, width=2)
+    draw.arc([cx + cup_w // 2 - 3, top_y, cx + cup_w // 2 + 5, top_y + 10], -90, 90, fill=gold, width=2)
+
+
+def _draw_medal(draw: ImageDraw.ImageDraw, cx: int, cy: int, rank: int, font):
+    """Hand-drawn ranking medal (gold/silver/bronze) with its position number."""
+    colors = {0: (255, 215, 0), 1: (192, 192, 192), 2: (205, 127, 50)}
+    color = colors.get(rank, (120, 126, 136))
+    r = 13
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color, outline=_darken(color, 60), width=2)
+    text = str(rank + 1)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text((cx - tw / 2, cy - th / 2 - bbox[1]), text, font=font, fill=(30, 30, 30))
+
+
 def _draw_horse(draw: ImageDraw.ImageDraw, x: int, cy: int, color, tick: int, speed: int, leading: bool):
     """Draws a galloping horse (body/neck/head/mane/legs/tail), facing right."""
     stride = tick % 4
@@ -88,7 +131,7 @@ def _draw_horse(draw: ImageDraw.ImageDraw, x: int, cy: int, color, tick: int, sp
     draw.line([(body_right - 6, body_top - 2), (head_cx - 4, head_cy - 2)], fill=_darken(color, 50), width=3)
 
     if leading:
-        draw.text((head_cx - 6, head_cy - 24), "👑", font=_font(14), fill=(255, 215, 0))
+        _draw_crown(draw, head_cx, head_cy - 24)
 
 
 def _draw_frame(positions: list[int], prev_positions: list[int] | None, distance: int, winner_idx: int | None) -> Image.Image:
@@ -131,7 +174,7 @@ def _draw_frame(positions: list[int], prev_positions: list[int] | None, distance
         _draw_horse(draw, min(x, TRACK_RIGHT - 4), cy, color, pos, speed, leading)
 
         if winner_idx == i:
-            draw.text((min(x, TRACK_RIGHT - 4) + 4, cy - 34), "🏆", font=_font(16), fill=(255, 215, 0))
+            _draw_trophy(draw, min(x, TRACK_RIGHT - 4) + 10, cy - 34)
 
     return img
 
@@ -166,7 +209,6 @@ def generate_race_gif(positions_history: list[list[int]], distance: int, winner_
 def generate_result_image(final_positions: list[int], distance: int, winner_idx: int) -> io.BytesIO:
     """Static podium-style image showing the final standings."""
     ranking = sorted(range(len(final_positions)), key=lambda i: final_positions[i], reverse=True)
-    medals = ["🥇", "🥈", "🥉"]
 
     row_h = 46
     height = 60 + row_h * len(ranking) + 20
@@ -181,8 +223,10 @@ def generate_result_image(final_positions: list[int], distance: int, winner_idx:
     for rank, idx in enumerate(ranking):
         y = 60 + rank * row_h
         color = HORSE_COLORS[idx % len(HORSE_COLORS)]
-        medal = medals[rank] if rank < 3 else f"{rank + 1}."
-        draw.text((16, y + 8), medal, font=row_font, fill=(230, 230, 230))
+        if rank < 3:
+            _draw_medal(draw, 26, y + 20, rank, row_font)
+        else:
+            draw.text((16, y + 8), f"{rank + 1}.", font=row_font, fill=(230, 230, 230))
         name_color = (255, 215, 0) if idx == winner_idx else color
         draw.text((60, y + 8), HORSE_NAMES[idx], font=row_font, fill=name_color)
 
