@@ -59,7 +59,7 @@ class HorseRaceCog(commands.Cog):
         embed.set_footer(text=status)
         return embed
 
-    @commands.hybrid_group(name="horserace", aliases=["carrera"], description="Carrera de caballos multijugador")
+    @commands.hybrid_group(name="horserace", description="Carrera de caballos multijugador")
     async def horserace(self, ctx: commands.Context):
         if ctx.invoked_subcommand is None:
             await self.start(ctx)
