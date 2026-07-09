@@ -11,6 +11,7 @@ from config import ROULETTE_RED, VALID_BETS
 from database import eco_col
 from utils.economy import get_user_data, get_wallet, update_wallet, parse_economy_amount, apply_amortization
 from views.game_views import BlackjackView
+from views.pvp_views import BlackjackChallengeView
 
 
 class GamesCog(commands.Cog):
@@ -179,6 +180,35 @@ class GamesCog(commands.Cog):
                 await msg.edit_original_response(embed=embed, view=view)
             else:
                 await msg.edit(embed=embed, view=view)
+
+    @commands.hybrid_command(name="bjpvp", aliases=["blackjackpvp"], description="Reta a otro jugador a un duelo de blackjack (Jugador vs Jugador)")
+    @app_commands.describe(opponent="El jugador al que retas", bet_amount="Cantidad ('all', 'half' o número)")
+    async def blackjack_pvp(self, ctx: commands.Context, opponent: discord.Member, bet_amount: str):
+        challenger_id = str(ctx.author.id)
+
+        if opponent.id == ctx.author.id:
+            return await ctx.send("❌ No puedes retarte a ti mismo.", ephemeral=True)
+        if opponent.bot:
+            return await ctx.send("❌ No puedes retar a un bot.", ephemeral=True)
+
+        challenger_data = get_user_data(challenger_id)
+        bet = parse_economy_amount(bet_amount, challenger_data["wallet"])
+
+        if bet <= 0:
+            return await ctx.send("❌ Apuesta inválida. Usa un número positivo, 'all' o 'half'.", ephemeral=True)
+        if challenger_data["wallet"] < bet:
+            return await ctx.send(f"❌ No tienes suficientes monedas. Tu saldo es 🪙 {challenger_data['wallet']:,}.", ephemeral=True)
+
+        opponent_data = get_user_data(str(opponent.id))
+        if opponent_data["wallet"] < bet:
+            return await ctx.send(f"❌ {opponent.mention} no tiene suficientes monedas para esta apuesta.", ephemeral=True)
+
+        view = BlackjackChallengeView(ctx.author, opponent, bet)
+        msg = await ctx.send(
+            f"🃏 {opponent.mention}, {ctx.author.mention} te reta a un duelo de blackjack por 🪙 {bet:,}. ¿Aceptas?",
+            view=view,
+        )
+        view.message = msg
 
     @commands.hybrid_command(name="dice", description="Roll two dice against the house")
     @app_commands.describe(bet_amount="Amount ('all', 'half', or number)")

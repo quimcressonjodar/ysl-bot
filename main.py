@@ -48,6 +48,7 @@ COGS = [
     "cogs.bounties",
     "cogs.business",
     "cogs.troll",
+    "cogs.horserace",
 ]
 
 

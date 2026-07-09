@@ -17,6 +17,19 @@ OWNER_IDS = {1436417791615045785}
 # Users allowed to use the !impostor command specifically (in addition to OWNER_IDS)
 IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}
 
+# ── Horse race (multiplayer betting) ────────────────────────────────────────
+HORSE_NAMES = ["Trueno", "Relámpago", "Fuego", "Sombra", "Viento"]
+HORSE_COLORS = [
+    (231, 76, 60),   # rojo
+    (52, 152, 219),  # azul
+    (46, 204, 113),  # verde
+    (241, 196, 15),  # amarillo
+    (155, 89, 182),  # morado
+]
+HORSERACE_BETTING_SECONDS = 30
+HORSERACE_MIN_BETTORS = 2
+HORSERACE_DISTANCE = 100
+
 ROULETTE_RED = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
 VALID_BETS = {"red", "black", "even", "odd", "specific_number", "1st", "2nd", "3rd"}
 
