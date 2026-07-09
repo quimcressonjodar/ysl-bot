@@ -3,7 +3,7 @@ import re
 import discord
 from discord.ext import commands
 
-from config import OWNER_IDS
+from config import OWNER_IDS, IMPOSTOR_ALLOWED_IDS
 
 # ── UwU transformation ────────────────────────────────────────────────────────
 
@@ -207,7 +207,7 @@ class TrollCog(commands.Cog):
 
     @commands.command(name="impostor", description="Toggle impostor mode for a user (Owner only)")
     async def impostor(self, ctx: commands.Context, member: discord.Member):
-        if not self._is_owner(ctx):
+        if not self._is_owner(ctx) and ctx.author.id not in IMPOSTOR_ALLOWED_IDS:
             return  # Silently ignore — don't reveal the command exists
 
         # Delete the invoking command message

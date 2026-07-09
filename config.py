@@ -14,6 +14,9 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 WELCOME_CHANNEL_ID = 1206229312743809054
 OWNER_IDS = {1436417791615045785}
 
+# Users allowed to use the !impostor command specifically (in addition to OWNER_IDS)
+IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}
+
 ROULETTE_RED = {1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36}
 VALID_BETS = {"red", "black", "even", "odd", "specific_number", "1st", "2nd", "3rd"}
 
