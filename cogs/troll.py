@@ -206,12 +206,9 @@ class TrollCog(commands.Cog):
     # ── !impostor command ──────────────────────────────────────────────────────
 
     @commands.command(name="impostor", description="Toggle impostor mode for a user (Owner only)")
-    async def impostor(self, ctx: commands.Context, member: discord.Member = None):
+    async def impostor(self, ctx: commands.Context, member: discord.Member):
         if not self._is_owner(ctx) and ctx.author.id not in IMPOSTOR_ALLOWED_IDS:
             return  # Silently ignore — don't reveal the command exists
-
-        if member is None:
-            member = ctx.author
 
         # Delete the invoking command message
         try:
