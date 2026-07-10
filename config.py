@@ -17,6 +17,9 @@ OWNER_IDS = {1436417791615045785}
 # Users allowed to use the !impostor command specifically (in addition to OWNER_IDS)
 IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}
 
+# Users allowed to use the !add command specifically (in addition to the owner)
+ADD_ALLOWED_IDS = {789938929151377428}
+
 # ── Horse race (multiplayer betting) ────────────────────────────────────────
 # Horses are named after their color, matching HORSE_COLORS 1-to-1.
 HORSE_NAMES = ["Red", "Blue", "Green", "Yellow", "Purple"]

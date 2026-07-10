@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from utils.helpers import is_admin, parse_duration, load_warns, save_warns
 from database import eco_col, pets_col
-from config import ROLE_SHOP, STOCKS
+from config import ROLE_SHOP, STOCKS, ADD_ALLOWED_IDS
 from utils.stocks import stocks_col, user_stocks_col, stock_alerts_col, ipo_col
 from utils.bounties import bounties_col
 
@@ -253,7 +253,7 @@ class AdminCog(commands.Cog):
     @app_commands.describe(member="The member to give coins to", amount="Amount of coins to add")
     @app_commands.default_permissions(administrator=True)
     async def add(self, ctx: commands.Context, member: discord.Member, amount: int):
-        if not is_admin(ctx):
+        if not is_admin(ctx) and ctx.author.id not in ADD_ALLOWED_IDS:
             return await ctx.send("❌ Admin only command.", ephemeral=True)
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than 0.", ephemeral=True)
