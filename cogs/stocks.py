@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import time
 import random
-from config import STOCKS, STOCK_UPDATE_INTERVAL, STOCK_FEE, OWNER_IDS, STOCK_NEWS_CHANNEL_ID
+from config import STOCKS, STOCK_UPDATE_INTERVAL, STOCK_FEE, OWNER_IDS
 from utils.stocks import (
     update_stock_prices, generate_stock_chart, get_current_price,
     get_user_portfolio, buy_stock, sell_stock, process_dividends,
@@ -15,6 +15,8 @@ from utils.stocks import (
 from utils.stock_news import get_random_news
 from utils.economy import get_wallet, update_wallet, get_bank, get_prestige_level
 from utils.helpers import is_admin
+
+STOCK_NEWS_CHANNEL_ID = 1513755454029959239
 
 
 class StockView(discord.ui.View):
