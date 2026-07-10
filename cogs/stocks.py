@@ -200,6 +200,10 @@ class Stocks(commands.Cog):
         except Exception as e:
             print(f"DIVIDEND ERROR: {e}")
 
+    @distribute_dividends.before_loop
+    async def before_distribute_dividends(self):
+        await self.bot.wait_until_ready()
+
     @update_stocks.before_loop
     async def before_update_stocks(self):
         await self.bot.wait_until_ready()

@@ -314,9 +314,11 @@ def process_dividends():
                 continue
             current_price = get_current_price(symbol)
             rate = rates[symbol]["rate"]
-            dividend = int(current_price * data["quantity"] * rate)
-            user_total_dividend += dividend
+            # Accumulate as float first so small per-stock amounts don't get
+            # truncated to 0 individually; only round once for the total.
+            user_total_dividend += current_price * data["quantity"] * rate
 
+        user_total_dividend = int(user_total_dividend)
         if user_total_dividend > 0:
             update_wallet(user_id, user_total_dividend)
             total_distributed += user_total_dividend
