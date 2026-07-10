@@ -3,7 +3,8 @@ from discord.ext import commands, tasks
 import time
 from utils.bounties import get_active_bounties, spawn_new_bounty
 from database import db
-from config import STOCK_NEWS_CHANNEL_ID
+
+STOCK_NEWS_CHANNEL_ID = 1513755454029959239
 
 class Bounties(commands.Cog):
     def __init__(self, bot):
