@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 import time
 from utils.bounties import get_active_bounties, spawn_new_bounty
 from database import db
+from config import STOCK_NEWS_CHANNEL_ID
 
 class Bounties(commands.Cog):
     def __init__(self, bot):
@@ -15,30 +16,32 @@ class Bounties(commands.Cog):
     @tasks.loop(hours=12)
     async def bounty_spawner(self):
         """Ensures there are always 3 active bounties on the board."""
-        active = get_active_bounties()
-        needed = 3 - len(active)
-        
-        if needed <= 0:
-            return
+        try:
+            active = get_active_bounties()
+            needed = 3 - len(active)
 
-        STOCK_NEWS_CHANNEL_ID = 1206197908399980575
-        channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
-        
-        for _ in range(needed):
-            new_b = spawn_new_bounty()
-            if not new_b:
-                continue
-                
-            # Announce each new bounty
-            if channel:
-                embed = discord.Embed(
-                    title="🎯 NEW BOUNTY POSTED",
-                    description=f"A new contract is available on the board!\n\n**{new_b['name']}**\n{new_b['description']}",
-                    color=0xE67E22
-                )
-                embed.add_field(name="💰 Reward", value=f"🪙 {new_b['reward']:,}")
-                embed.set_footer(text="Use !bounties to see all active contracts.")
-                await channel.send(embed=embed)
+            if needed <= 0:
+                return
+
+            channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
+
+            for _ in range(needed):
+                new_b = spawn_new_bounty()
+                if not new_b:
+                    continue
+
+                # Announce each new bounty
+                if channel:
+                    embed = discord.Embed(
+                        title="🎯 NEW BOUNTY POSTED",
+                        description=f"A new contract is available on the board!\n\n**{new_b['name']}**\n{new_b['description']}",
+                        color=0xE67E22
+                    )
+                    embed.add_field(name="💰 Reward", value=f"🪙 {new_b['reward']:,}")
+                    embed.set_footer(text="Use !bounties to see all active contracts.")
+                    await channel.send(embed=embed)
+        except Exception as e:
+            print(f"BOUNTY SPAWNER ERROR: {e}")
 
     @bounty_spawner.before_loop
     async def before_bounty_spawner(self):

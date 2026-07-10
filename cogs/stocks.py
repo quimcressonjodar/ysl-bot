@@ -3,7 +3,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 import time
 import random
-from config import STOCKS, STOCK_UPDATE_INTERVAL, STOCK_FEE, OWNER_IDS
+from config import STOCKS, STOCK_UPDATE_INTERVAL, STOCK_FEE, OWNER_IDS, STOCK_NEWS_CHANNEL_ID
 from utils.stocks import (
     update_stock_prices, generate_stock_chart, get_current_price,
     get_user_portfolio, buy_stock, sell_stock, process_dividends,
@@ -147,7 +147,6 @@ class Stocks(commands.Cog):
                 symbol, message, multiplier = get_random_news()
                 news_impact[symbol] = multiplier
 
-                STOCK_NEWS_CHANNEL_ID = 1513755454029959239
                 channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
                 if channel:
                     embed = discord.Embed(title="🗞️ Market News Alert", description=message, color=0xF1C40F)
@@ -169,7 +168,6 @@ class Stocks(commands.Cog):
         try:
             users, total, rates = process_dividends()
             if users > 0:
-                STOCK_NEWS_CHANNEL_ID = 1513755454029959239
                 channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
                 if channel:
                     # Sort stocks by dividend rate to show best and worst payers
@@ -748,7 +746,6 @@ class Stocks(commands.Cog):
             )
         embed.set_footer(text="Market news can already affect this company.")
 
-        STOCK_NEWS_CHANNEL_ID = 1513755454029959239
         channel = self.bot.get_channel(STOCK_NEWS_CHANNEL_ID)
         if channel and channel.id != ctx.channel.id:
             await channel.send(embed=embed)
