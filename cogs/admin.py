@@ -514,6 +514,28 @@ class AdminCog(commands.Cog):
         await ctx.send(embed=embed)
 
 
+    @commands.hybrid_command(name="leaveserver", description="Make the bot leave a specific server by ID (Owner only)")
+    @app_commands.describe(server_id="The ID of the server the bot should leave")
+    @app_commands.default_permissions(administrator=True)
+    async def leaveserver(self, ctx: commands.Context, server_id: str):
+        if not is_admin(ctx):
+            return await ctx.send("❌ You do not have permission to use this command.", ephemeral=True)
+        try:
+            sid = int(server_id)
+        except ValueError:
+            return await ctx.send("❌ That doesn't look like a valid server ID.", ephemeral=True)
+
+        guild = self.bot.get_guild(sid)
+        if not guild:
+            return await ctx.send("❌ I'm not in a server with that ID.", ephemeral=True)
+
+        name = guild.name
+        try:
+            await ctx.send(f"👋 Leaving **{name}** (`{sid}`)...")
+            await guild.leave()
+        except Exception as e:
+            await ctx.send(f"❌ Failed to leave **{name}**: {e}", ephemeral=True)
+
     @commands.hybrid_command(name="setuproles", description="Create all shop roles in this server and update their IDs (Admin only)")
     @app_commands.default_permissions(administrator=True)
     async def setuproles(self, ctx: commands.Context):
