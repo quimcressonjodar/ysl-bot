@@ -778,9 +778,36 @@ class Stocks(commands.Cog):
 
         current = history["prices"][-1]["price"]
         new_price = max(50, current + amount)
-        new_entry = {"price": new_price, "timestamp": time.time()}
 
-        prices = history["prices"] + [new_entry]
+        # Spread the move across several smaller, slightly-noisy steps instead
+        # of one dead-straight line segment, so it blends in with normal
+        # organic price movement on the chart.
+        steps = random.randint(4, 6)
+        now = time.time()
+        step_span = min(STOCK_UPDATE_INTERVAL - 2, 25)  # seconds between synthetic ticks
+        start_time = now - step_span * (steps - 1)
+        last_timestamp = history["prices"][-1]["timestamp"]
+        if start_time <= last_timestamp:
+            # Keep timestamps strictly increasing even if the last real
+            # update happened very recently.
+            start_time = last_timestamp + 1
+            step_span = max(1, (now - start_time) / max(1, steps - 1))
+
+        new_entries = []
+        total_delta = new_price - current
+        for i in range(1, steps + 1):
+            progress = i / steps
+            # Ease the progression a bit and add small random noise to each
+            # intermediate point so it doesn't look perfectly linear either.
+            base = current + total_delta * progress
+            if i < steps:
+                noise = base * random.uniform(-0.01, 0.01)
+                point_price = max(50, int(base + noise))
+            else:
+                point_price = new_price  # land exactly on the target
+            new_entries.append({"price": point_price, "timestamp": start_time + step_span * (i - 1)})
+
+        prices = history["prices"] + new_entries
         stocks_col.update_one({"symbol": symbol}, {"$set": {"prices": prices}})
 
         direction = "📈" if amount >= 0 else "📉"
