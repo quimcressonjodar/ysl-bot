@@ -7,7 +7,7 @@ from discord.ext import commands
 
 from utils.helpers import is_admin, parse_duration, load_warns, save_warns, get_next_warn_id, can_moderate
 from database import eco_col, pets_col
-from config import ROLE_SHOP, STOCKS, ADD_ALLOWED_IDS
+from config import ROLE_SHOP, STOCKS, ADD_ALLOWED_IDS, MAX_ECONOMY_AMOUNT
 from utils.stocks import stocks_col, user_stocks_col, stock_alerts_col, ipo_col
 from utils.bounties import bounties_col
 
@@ -398,6 +398,19 @@ class AdminCog(commands.Cog):
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than 0.", ephemeral=True)
         from utils.economy import update_wallet, get_wallet
+        if amount > MAX_ECONOMY_AMOUNT:
+            return await ctx.send(
+                f"❌ That amount is too large. MongoDB can only store numbers up to ~9.2 quintillion "
+                f"(8-byte int), so the max per `!add` is 🪙 **{MAX_ECONOMY_AMOUNT:,}**.",
+                ephemeral=True,
+            )
+        current = get_wallet(str(member.id))
+        if current + amount > MAX_ECONOMY_AMOUNT:
+            return await ctx.send(
+                f"❌ That would push {member.mention}'s wallet past the safe storage limit of "
+                f"🪙 **{MAX_ECONOMY_AMOUNT:,}**. Reduce the amount.",
+                ephemeral=True,
+            )
         update_wallet(str(member.id), amount)
         wallet = get_wallet(str(member.id))
         embed = discord.Embed(
@@ -415,6 +428,11 @@ class AdminCog(commands.Cog):
             return await ctx.send("❌ Admin only command.", ephemeral=True)
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than 0.", ephemeral=True)
+        if amount > MAX_ECONOMY_AMOUNT:
+            return await ctx.send(
+                f"❌ That amount is too large. The max per `!remove` is 🪙 **{MAX_ECONOMY_AMOUNT:,}**.",
+                ephemeral=True,
+            )
         from utils.economy import update_wallet, get_wallet
         current = get_wallet(str(member.id))
         deduct = min(amount, current)

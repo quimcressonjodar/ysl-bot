@@ -20,6 +20,11 @@ IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377
 # Users allowed to use the !add command specifically (in addition to the owner)
 ADD_ALLOWED_IDS = {789938929151377428}
 
+# MongoDB stores numbers as 8-byte (int64) values, max ~9.22 quintillion.
+# Keep economy amounts well under that ceiling so a single command (or a
+# few of them stacked together) can never overflow it and crash.
+MAX_ECONOMY_AMOUNT = 1_000_000_000_000_000  # 1 quadrillion
+
 # ── Horse race (multiplayer betting) ────────────────────────────────────────
 # Horses are named after their color, matching HORSE_COLORS 1-to-1.
 HORSE_NAMES = ["Red", "Blue", "Green", "Yellow", "Purple"]
