@@ -779,30 +779,53 @@ class Stocks(commands.Cog):
         current = history["prices"][-1]["price"]
         new_price = max(50, current + amount)
 
-        # A single freshly-appended point necessarily sits right at "now",
-        # while every other point on the chart is spaced ~STOCK_UPDATE_INTERVAL
-        # minutes apart. On that timescale, a few synthetic points crammed
-        # into the last couple of minutes are visually indistinguishable from
-        # a single vertical jump. Instead, retroactively reshape the last few
-        # *real* points (which already have properly-spaced timestamps) so
-        # the climb/drop plays out across actual chart real-estate, then
-        # land on the target with the final real timestamp.
+        # Reshaping the *existing* recent points (previous approach) only
+        # fixes the price values, not their timestamps. If a couple of raises
+        # get tested within minutes of each other (real ticks only land every
+        # STOCK_UPDATE_INTERVAL minutes), every "recent" point is still
+        # clustered within seconds/minutes of "now" no matter how we reshape
+        # the prices, so the chart still renders as a near-vertical line.
+        #
+        # Fix for good: carve out a fabricated window of the past spanning
+        # several real tick-intervals, spaced exactly like normal updates
+        # (with slight jitter), discard whatever real/leftover points fall
+        # inside that window, and replace them with a smooth+noisy ramp from
+        # the price just before the window to the target price. This makes
+        # the move look like several normal ticks regardless of how much
+        # real wall-clock time has actually elapsed.
         prices = history["prices"]
-        window = min(len(prices), random.randint(5, 8))
-        start_idx = len(prices) - window
-        start_price = prices[start_idx - 1]["price"] if start_idx > 0 else prices[start_idx]["price"]
+        steps = random.randint(5, 8)
+        spacing = STOCK_UPDATE_INTERVAL * 60  # seconds between normal real ticks
+        now = time.time()
+
+        # Timestamps for the fabricated window, oldest to newest, landing on
+        # "now". Build strictly-increasing gaps (with jitter) working forward
+        # from the earliest point so ordering can never invert.
+        gaps = [spacing * random.uniform(0.7, 1.3) for _ in range(steps - 1)]
+        new_timestamps = [now - sum(gaps)]
+        for gap in gaps:
+            new_timestamps.append(new_timestamps[-1] + gap)
+        new_timestamps[-1] = now
+        window_start = new_timestamps[0]
+
+        # Keep only points strictly before our fabricated window; drop anything
+        # (real or leftover from earlier tests) that falls inside it.
+        kept = [p for p in prices if p["timestamp"] < window_start]
+        start_price = kept[-1]["price"] if kept else current
         total_delta = new_price - start_price
 
-        for offset, i in enumerate(range(start_idx, len(prices)), start=1):
-            progress = offset / window
+        new_entries = []
+        for i, ts in enumerate(new_timestamps, start=1):
+            progress = i / steps
             base = start_price + total_delta * progress
-            if i == len(prices) - 1:
-                point_price = new_price  # land exactly on the target at the latest point
+            if i == steps:
+                point_price = new_price  # land exactly on the target
             else:
                 noise = base * random.uniform(-0.015, 0.015)
                 point_price = max(50, int(base + noise))
-            prices[i]["price"] = point_price
+            new_entries.append({"price": point_price, "timestamp": ts})
 
+        prices = kept + new_entries
         stocks_col.update_one({"symbol": symbol}, {"$set": {"prices": prices}})
 
         direction = "📈" if amount >= 0 else "📉"
