@@ -779,35 +779,30 @@ class Stocks(commands.Cog):
         current = history["prices"][-1]["price"]
         new_price = max(50, current + amount)
 
-        # Spread the move across several smaller, slightly-noisy steps instead
-        # of one dead-straight line segment, so it blends in with normal
-        # organic price movement on the chart.
-        steps = random.randint(4, 6)
-        now = time.time()
-        step_span = min(STOCK_UPDATE_INTERVAL - 2, 25)  # seconds between synthetic ticks
-        start_time = now - step_span * (steps - 1)
-        last_timestamp = history["prices"][-1]["timestamp"]
-        if start_time <= last_timestamp:
-            # Keep timestamps strictly increasing even if the last real
-            # update happened very recently.
-            start_time = last_timestamp + 1
-            step_span = max(1, (now - start_time) / max(1, steps - 1))
+        # A single freshly-appended point necessarily sits right at "now",
+        # while every other point on the chart is spaced ~STOCK_UPDATE_INTERVAL
+        # minutes apart. On that timescale, a few synthetic points crammed
+        # into the last couple of minutes are visually indistinguishable from
+        # a single vertical jump. Instead, retroactively reshape the last few
+        # *real* points (which already have properly-spaced timestamps) so
+        # the climb/drop plays out across actual chart real-estate, then
+        # land on the target with the final real timestamp.
+        prices = history["prices"]
+        window = min(len(prices), random.randint(5, 8))
+        start_idx = len(prices) - window
+        start_price = prices[start_idx - 1]["price"] if start_idx > 0 else prices[start_idx]["price"]
+        total_delta = new_price - start_price
 
-        new_entries = []
-        total_delta = new_price - current
-        for i in range(1, steps + 1):
-            progress = i / steps
-            # Ease the progression a bit and add small random noise to each
-            # intermediate point so it doesn't look perfectly linear either.
-            base = current + total_delta * progress
-            if i < steps:
-                noise = base * random.uniform(-0.01, 0.01)
-                point_price = max(50, int(base + noise))
+        for offset, i in enumerate(range(start_idx, len(prices)), start=1):
+            progress = offset / window
+            base = start_price + total_delta * progress
+            if i == len(prices) - 1:
+                point_price = new_price  # land exactly on the target at the latest point
             else:
-                point_price = new_price  # land exactly on the target
-            new_entries.append({"price": point_price, "timestamp": start_time + step_span * (i - 1)})
+                noise = base * random.uniform(-0.015, 0.015)
+                point_price = max(50, int(base + noise))
+            prices[i]["price"] = point_price
 
-        prices = history["prices"] + new_entries
         stocks_col.update_one({"symbol": symbol}, {"$set": {"prices": prices}})
 
         direction = "📈" if amount >= 0 else "📉"
