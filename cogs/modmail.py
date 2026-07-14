@@ -9,6 +9,12 @@ from database import modmail_col
 
 logger = logging.getLogger("weekly-xp-bot")
 
+# Reacted onto a user's DM once it has actually been delivered to staff.
+# This is the only proof of delivery — it cannot be faked by a third party,
+# since only the bot can react as itself, so users can trust that seeing
+# this checkmark means a real staff thread received their message.
+DELIVERED_EMOJI = "✅"
+
 
 def _safe_thread_name(user: discord.abc.User) -> str:
     name = f"{user.name} ({user.id})"
@@ -81,8 +87,8 @@ class ModMail(commands.Cog):
         )
 
         await thread.send(
-            f"📨 Nuevo ticket de modmail — {user.mention} (`{user.id}`)\n"
-            f"Respondan acá y el mensaje se le reenvía por DM. Usen `!close` para cerrar el ticket."
+            f"📨 **New modmail ticket** — {user.mention} (`{user.id}`)\n"
+            f"Reply in this thread to respond directly to the user. Use `!close` to close the ticket."
         )
         return thread
 
@@ -94,14 +100,14 @@ class ModMail(commands.Cog):
         if thread is None:
             try:
                 await message.channel.send(
-                    "❌ No pude entregar tu mensaje al staff en este momento. Intenta de nuevo más tarde."
+                    "We couldn't deliver your message to staff right now. Please try again shortly."
                 )
             except discord.HTTPException:
                 pass
             return
 
         embed = discord.Embed(
-            description=message.content or "*(sin texto)*",
+            description=message.content or "*(no text content)*",
             color=0x5865F2,
             timestamp=message.created_at,
         )
@@ -121,12 +127,28 @@ class ModMail(commands.Cog):
             await thread.send(embed=embed, files=files)
         except discord.HTTPException as e:
             logger.error("Failed to relay DM to modmail thread: %s", e)
+            try:
+                await message.channel.send(
+                    "We couldn't deliver your message to staff right now. Please try again shortly."
+                )
+            except discord.HTTPException:
+                pass
             return
+
+        # Verified delivery: react on the user's own DM message. This is the
+        # only confirmation signal — a genuine checkmark from the bot means
+        # the message actually reached a staff thread, so it can't be spoofed.
+        try:
+            await message.add_reaction(DELIVERED_EMOJI)
+        except discord.HTTPException:
+            pass
 
         if is_new:
             try:
                 await message.channel.send(
-                    "✅ Tu mensaje fue enviado al staff. Te van a responder por aquí mismo, en este chat."
+                    "Thank you for contacting us. Your message has been forwarded to our staff team, "
+                    "and you'll receive replies right here in this DM. A ✅ reaction on your message "
+                    "confirms it was delivered to staff."
                 )
             except discord.HTTPException:
                 pass
@@ -139,18 +161,21 @@ class ModMail(commands.Cog):
         try:
             user = self.bot.get_user(int(doc["_id"])) or await self.bot.fetch_user(int(doc["_id"]))
         except (discord.NotFound, discord.HTTPException):
-            await message.reply("❌ No pude encontrar a ese usuario (¿eliminó su cuenta?).", mention_author=False)
+            await message.reply(
+                "Could not find that user (their account may have been deleted).", mention_author=False
+            )
             return
 
         embed = discord.Embed(
-            description=message.content or "*(sin texto)*",
+            description=message.content or "*(no text content)*",
             color=0x57F287,
             timestamp=message.created_at,
         )
         embed.set_author(
-            name=f"Staff: {message.author.display_name}",
+            name=f"Staff — {message.author.display_name}",
             icon_url=message.author.display_avatar.url,
         )
+        embed.set_footer(text="Support Team")
 
         files = []
         for attachment in message.attachments:
@@ -161,10 +186,12 @@ class ModMail(commands.Cog):
 
         try:
             await user.send(embed=embed, files=files)
-            await message.add_reaction("✅")
+            # Verified delivery: react on the staff message so the team can
+            # see at a glance that the reply actually reached the user.
+            await message.add_reaction(DELIVERED_EMOJI)
         except discord.Forbidden:
             await message.reply(
-                "❌ No pude entregar el mensaje — el usuario tiene los DMs cerrados o bloqueó al bot.",
+                "Delivery failed — this user has DMs disabled or has blocked the bot.",
                 mention_author=False,
             )
         except discord.HTTPException as e:
@@ -195,7 +222,7 @@ class ModMail(commands.Cog):
 
     # ── Commands ─────────────────────────────────────────────────────────────
 
-    @commands.hybrid_command(name="close", description="Cierra el ticket de modmail actual")
+    @commands.hybrid_command(name="close", description="Close the current modmail ticket")
     async def close(self, ctx: commands.Context):
         if not (
             ctx.guild
@@ -203,11 +230,11 @@ class ModMail(commands.Cog):
             and isinstance(ctx.channel, discord.Thread)
             and ctx.channel.parent_id == MODMAIL_CHANNEL_ID
         ):
-            return await ctx.send("❌ Este comando solo se puede usar dentro de un ticket de modmail.", ephemeral=True)
+            return await ctx.send("This command can only be used inside a modmail ticket thread.", ephemeral=True)
 
         doc = modmail_col.find_one({"thread_id": ctx.channel.id})
         if not doc:
-            return await ctx.send("❌ Este hilo no está registrado como ticket de modmail.", ephemeral=True)
+            return await ctx.send("This thread isn't registered as a modmail ticket.", ephemeral=True)
 
         modmail_col.update_one(
             {"_id": doc["_id"]},
@@ -216,11 +243,14 @@ class ModMail(commands.Cog):
 
         try:
             user = self.bot.get_user(int(doc["_id"])) or await self.bot.fetch_user(int(doc["_id"]))
-            await user.send("🔒 El staff cerró esta conversación. Si necesitas algo más, escríbenos de nuevo por aquí.")
+            await user.send(
+                "This conversation has been closed by our staff team. "
+                "If you need anything else, feel free to message us again."
+            )
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
-        await ctx.send("✅ Ticket cerrado.")
+        await ctx.send("✅ Ticket closed.")
         try:
             await ctx.channel.edit(archived=True, locked=True)
         except discord.HTTPException:
