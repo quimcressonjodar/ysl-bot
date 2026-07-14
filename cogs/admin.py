@@ -405,14 +405,13 @@ class AdminCog(commands.Cog):
             return await ctx.send("❌ Amount must be greater than 0.", ephemeral=True)
         if amount > MAX_ECONOMY_AMOUNT:
             return await ctx.send(
-                f"❌ That amount is too large. MongoDB can only store numbers up to ~9.2 quintillion "
-                f"(8-byte int), so the max per `!add` is 🪙 **{MAX_ECONOMY_AMOUNT:,}**.",
+                f"❌ That amount is too large. The max per `!add` is 🪙 **{MAX_ECONOMY_AMOUNT:,}**.",
                 ephemeral=True,
             )
         current = get_wallet(str(member.id))
         if current + amount > MAX_ECONOMY_AMOUNT:
             return await ctx.send(
-                f"❌ That would push {member.mention}'s wallet past the safe storage limit of "
+                f"❌ That would push {member.mention}'s wallet past the safety limit of "
                 f"🪙 **{MAX_ECONOMY_AMOUNT:,}**. Reduce the amount.",
                 ephemeral=True,
             )

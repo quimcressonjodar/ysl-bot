@@ -8,6 +8,7 @@ from discord.ext import commands, tasks
 import state
 from config import WELCOME_CHANNEL_ID, ADVENTURE_LOOT
 from database import eco_col
+from utils.economy import to_decimal128, normalize_economy_doc
 
 logger = logging.getLogger("weekly-xp-bot")
 
@@ -139,6 +140,7 @@ class EventsCog(commands.Cog):
         users_with_loans = eco_col.find({"loan_amount": {"$gt": 0}})
 
         for user_data in users_with_loans:
+            normalize_economy_doc(user_data)
             user_id   = user_data["_id"]
             last_calc = user_data.get("last_interest_calc", now)
             time_diff = now - last_calc
@@ -151,7 +153,7 @@ class EventsCog(commands.Cog):
                     eco_col.update_one(
                         {"_id": user_id},
                         {
-                            "$inc": {"interest_accrued": interest},
+                            "$inc": {"interest_accrued": to_decimal128(interest)},
                             "$set": {"last_interest_calc": now},
                         },
                     )

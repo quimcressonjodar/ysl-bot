@@ -1,7 +1,7 @@
 import discord
 
 from database import eco_col
-from utils.economy import get_user_data
+from utils.economy import get_user_data, to_decimal128
 
 
 class SellSelect(discord.ui.Select):
@@ -55,7 +55,7 @@ class SellSelect(discord.ui.Select):
             actual_value = apply_amortization(user_id, total_value)
             eco_col.update_one(
                 {"_id": user_id},
-                {"$inc": {"wallet": actual_value}, "$set": {"inventory": []}},
+                {"$inc": {"wallet": to_decimal128(actual_value)}, "$set": {"inventory": []}},
             )
             embed = discord.Embed(title="💰 All Items Sold", color=0x2ECC71)
             desc = f"Sold **{len(inventory)}** items\n\nTotal Earned: 🪙 **{total_value:,}**"
@@ -76,7 +76,7 @@ class SellSelect(discord.ui.Select):
 
         eco_col.update_one(
             {"_id": user_id},
-            {"$inc": {"wallet": actual_value}, "$set": {"inventory": inventory}},
+            {"$inc": {"wallet": to_decimal128(actual_value)}, "$set": {"inventory": inventory}},
         )
 
         embed = discord.Embed(title="💰 Item Sold", color=0x2ECC71)

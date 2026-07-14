@@ -9,7 +9,7 @@ from discord.ext import commands
 
 from config import ROULETTE_RED, VALID_BETS
 from database import eco_col
-from utils.economy import get_user_data, get_wallet, update_wallet, parse_economy_amount, apply_amortization
+from utils.economy import get_user_data, get_wallet, update_wallet, parse_economy_amount, apply_amortization, to_decimal128
 from views.game_views import BlackjackView
 from views.pvp_views import BlackjackChallengeView
 
@@ -267,7 +267,7 @@ class GamesCog(commands.Cog):
             base_winnings = bet * multiplier
             profit = base_winnings - bet
             winnings = apply_amortization(user_id, base_winnings)
-            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": winnings}, "$set": {"last_dice": now}}, upsert=True)
+            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(winnings)}, "$set": {"last_dice": now}}, upsert=True)
             
             # Bounty Tracking
             from utils.bounties import track_bounty_progress
@@ -278,7 +278,7 @@ class GamesCog(commands.Cog):
             if winnings < base_winnings:
                 result += f"\n📉 🪙 {base_winnings - winnings:,} coins used to pay debt."
         elif p_total < h_total:
-            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": -bet}, "$set": {"last_dice": now}}, upsert=True)
+            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(-bet)}, "$set": {"last_dice": now}}, upsert=True)
             result = f"you **lost** **{bet:,}** 🪙"
         else:
             result = f"you **tied**, **{bet:,}** 🪙 refunded"

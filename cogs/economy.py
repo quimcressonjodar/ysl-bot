@@ -20,6 +20,8 @@ from utils.economy import (
     update_loan,
     update_interest,
     apply_amortization,
+    to_decimal128,
+    normalize_economy_doc,
 )
 from views.economy_views import SellView
 
@@ -113,7 +115,7 @@ class EconomyCog(commands.Cog):
         amount = apply_amortization(user_id, base_amount)
         eco_col.update_one(
             {"_id": user_id},
-            {"$inc": {"wallet": amount}, "$set": {"last_daily": today_str}},
+            {"$inc": {"wallet": to_decimal128(amount)}, "$set": {"last_daily": today_str}},
             upsert=True,
         )
         
@@ -157,7 +159,7 @@ class EconomyCog(commands.Cog):
         amount = apply_amortization(user_id, base_amount)
         eco_col.update_one(
             {"_id": user_id},
-            {"$inc": {"wallet": amount}, "$set": {"last_weekly": week_str}},
+            {"$inc": {"wallet": to_decimal128(amount)}, "$set": {"last_weekly": week_str}},
             upsert=True,
         )
         
@@ -208,7 +210,7 @@ class EconomyCog(commands.Cog):
         actual_total = apply_amortization(user_id, total)
         eco_col.update_one(
             {"_id": user_id},
-            {"$inc": {"wallet": actual_total}, "$set": {"last_claim": now.isoformat()}},
+            {"$inc": {"wallet": to_decimal128(actual_total)}, "$set": {"last_claim": now.isoformat()}},
             upsert=True,
         )
         next_claim_ts = int(now.timestamp() + 3600)
@@ -253,7 +255,7 @@ class EconomyCog(commands.Cog):
     @commands.hybrid_command(name="leaderboard", aliases=["lb", "top"], description="Shows the richest members")
     async def leaderboard(self, ctx: commands.Context):
         users = sorted(
-            eco_col.find(),
+            (normalize_economy_doc(u) for u in eco_col.find()),
             key=lambda u: u.get("wallet", 0) + u.get("bank", 0),
             reverse=True,
         )[:10]
@@ -303,7 +305,7 @@ class EconomyCog(commands.Cog):
         ]
         reason = random.choice(jobs)
         next_work_ts = int(now + cooldown)
-        eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": earnings}, "$set": {"last_work": now}}, upsert=True)
+        eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(earnings)}, "$set": {"last_work": now}}, upsert=True)
         
         # Bounty Tracking
         from utils.bounties import track_bounty_progress
@@ -342,7 +344,7 @@ class EconomyCog(commands.Cog):
         if success:
             base_earnings = random.randint(2000, 6500)
             earnings = apply_amortization(user_id, base_earnings)
-            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": earnings}, "$set": {"last_crime": now}}, upsert=True)
+            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(earnings)}, "$set": {"last_crime": now}}, upsert=True)
             msg = random.choice([
                 "robbed an underground casino", "hacked a billionaire's bank account",
                 "stole a cybernetic sports car", "smuggled rare alien artifacts",
@@ -362,7 +364,7 @@ class EconomyCog(commands.Cog):
             embed = discord.Embed(title="🦹 Crime Successful", description=desc, color=0x2ECC71)
         else:
             fine = random.randint(1000, min(3500, wallet))
-            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": -fine}, "$set": {"last_crime": now}}, upsert=True)
+            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(-fine)}, "$set": {"last_crime": now}}, upsert=True)
             msg = random.choice([
                 "tripped over a trash can while running from the cops", "left your ID at the crime scene",
                 "tried to hack a government server but forgot to turn on your VPN",
@@ -393,8 +395,8 @@ class EconomyCog(commands.Cog):
         if success:
             base_stolen = random.randint(150, int(target_data.get("wallet", 0) * 0.30))
             stolen = apply_amortization(thief_id, base_stolen)
-            eco_col.update_one({"_id": thief_id}, {"$inc": {"wallet": stolen}, "$set": {"last_rob": now}}, upsert=True)
-            eco_col.update_one({"_id": target_id}, {"$inc": {"wallet": -base_stolen}}, upsert=True)
+            eco_col.update_one({"_id": thief_id}, {"$inc": {"wallet": to_decimal128(stolen)}, "$set": {"last_rob": now}}, upsert=True)
+            eco_col.update_one({"_id": target_id}, {"$inc": {"wallet": to_decimal128(-base_stolen)}}, upsert=True)
             msg = random.choice([
                 "jumped through a window like a movie thief", "pickpocketed them during a crowded concert",
                 "used fake security credentials to access their vault", "escaped through the rooftops after the robbery",
@@ -420,7 +422,7 @@ class EconomyCog(commands.Cog):
             fine = random.randint(150, 500)
             eco_col.update_one(
                 {"_id": thief_id},
-                {"$inc": {"wallet": -fine}, "$set": {"last_rob": now, "wanted_until": int(now + 2700)}},
+                {"$inc": {"wallet": to_decimal128(-fine)}, "$set": {"last_rob": now, "wanted_until": int(now + 2700)}},
                 upsert=True,
             )
             msg = random.choice([
@@ -573,7 +575,7 @@ class EconomyCog(commands.Cog):
         if drop["type"] == "coins":
             base_reward = drop["reward"]
             reward = apply_amortization(user_id, base_reward)
-            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": reward}}, upsert=True)
+            eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(reward)}}, upsert=True)
             msg = f"🌠 {ctx.author.mention} claimed the drop and received 🪙 {reward:,}!"
             if reward < base_reward:
                 msg += f"\n📉 🪙 {base_reward - reward:,} coins were automatically used to pay your debt."
@@ -635,14 +637,13 @@ class EconomyCog(commands.Cog):
         if parsed_amount > limit:
             return await ctx.send(f"❌ Your credit limit is 🪙 {limit:,} based on your net worth and prestige.", ephemeral=True)
 
-        # No fixed business cap anymore — rich enough players scale past it via
-        # their own net worth-based credit limit. The only remaining ceiling
-        # is MongoDB's storage limit (8-byte int), which would crash the bot
-        # rather than being a real gameplay limit.
+        # Coins are stored as Decimal128 (not a plain 8-byte Mongo int), so this
+        # is just a sanity cap far below any realistic credit limit — not a
+        # storage constraint.
         from config import MAX_ECONOMY_AMOUNT
         if parsed_amount > MAX_ECONOMY_AMOUNT or wallet + parsed_amount > MAX_ECONOMY_AMOUNT:
             return await ctx.send(
-                f"❌ Even your credit limit can't be paid out — it would exceed the safe storage limit of "
+                f"❌ Even your credit limit can't be paid out — it would exceed the safety limit of "
                 f"🪙 **{MAX_ECONOMY_AMOUNT:,}**. Try a smaller amount.",
                 ephemeral=True,
             )
@@ -652,7 +653,7 @@ class EconomyCog(commands.Cog):
         result = eco_col.update_one(
             {"_id": user_id, "$or": [{"loan_amount": {"$exists": False}}, {"loan_amount": {"$lte": 0}}]},
             {
-                "$inc": {"loan_amount": parsed_amount, "wallet": parsed_amount},
+                "$inc": {"loan_amount": to_decimal128(parsed_amount), "wallet": to_decimal128(parsed_amount)},
                 "$set": {"last_interest_calc": now, "loan_start_time": now}
             }
         )
@@ -694,8 +695,8 @@ class EconomyCog(commands.Cog):
                 {"_id": user_id},
                 {
                     "$inc": {
-                        "interest_accrued": -parsed_amount,
-                        "wallet": -parsed_amount
+                        "interest_accrued": to_decimal128(-parsed_amount),
+                        "wallet": to_decimal128(-parsed_amount)
                     }
                 }
             )
@@ -705,9 +706,9 @@ class EconomyCog(commands.Cog):
                 {"_id": user_id},
                 {
                     "$inc": {
-                        "interest_accrued": -interest,
-                        "loan_amount": -remaining,
-                        "wallet": -parsed_amount
+                        "interest_accrued": to_decimal128(-interest),
+                        "loan_amount": to_decimal128(-remaining),
+                        "wallet": to_decimal128(-parsed_amount)
                     }
                 }
             )

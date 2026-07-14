@@ -8,7 +8,7 @@ import discord
 import state
 from config import PET_SHOP, PET_RARITIES, PET_LOOT_PROBABILITIES, ADVENTURE_LOOT, ADVENTURE_EVENTS, FOOD_ITEMS
 from database import eco_col, pets_col
-from utils.economy import get_user_data, get_wallet, update_wallet
+from utils.economy import get_user_data, get_wallet, update_wallet, to_decimal128, normalize_economy_doc
 from utils.pets import get_current_hunger, get_pet_state
 
 
@@ -155,7 +155,7 @@ async def start_pet_battle(channel, battle_id: str) -> None:
 
     from utils.economy import update_loan, update_interest
     
-    eco_col.update_one({"_id": winner_id}, {"$inc": {"wallet": bet_amount}}, upsert=True)
+    eco_col.update_one({"_id": winner_id}, {"$inc": {"wallet": to_decimal128(bet_amount)}}, upsert=True)
     
     # Check if wallet will go negative
     from utils.economy import get_user_data as _get
@@ -164,13 +164,13 @@ async def start_pet_battle(channel, battle_id: str) -> None:
     
     if current_wallet < bet_amount:
         debt_incurred = bet_amount - current_wallet
-        eco_col.update_one({"_id": loser_id}, {"$set": {"wallet": 0}}, upsert=True)
+        eco_col.update_one({"_id": loser_id}, {"$set": {"wallet": to_decimal128(0)}}, upsert=True)
         update_loan(loser_id, debt_incurred)
         # Set last interest calc if not set
         if "last_interest_calc" not in loser_data_before:
             eco_col.update_one({"_id": loser_id}, {"$set": {"last_interest_calc": time.time()}})
     else:
-        eco_col.update_one({"_id": loser_id}, {"$inc": {"wallet": -bet_amount}}, upsert=True)
+        eco_col.update_one({"_id": loser_id}, {"$inc": {"wallet": to_decimal128(-bet_amount)}}, upsert=True)
 
     winner_data = _get(winner_id)
     loser_data = _get(loser_id)
@@ -553,7 +553,7 @@ class SellPetSelect(discord.ui.Select):
         sell_price = shop_price // 2
         
         pets_col.update_one({"_id": user_id}, {"$set": {"pets": pets}})
-        eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": sell_price}}, upsert=True)
+        eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(sell_price)}}, upsert=True)
         
         embed = discord.Embed(title="💰 Pet Sold", color=0x2ECC71)
         embed.description = f"Sold your **{pet['type'].capitalize()}**\n\nReceived: 🪙 **{sell_price:,}**"

@@ -1,7 +1,43 @@
 import re
 import time
+from bson.decimal128 import Decimal128
 from database import eco_col
 from discord.ext import commands
+
+# Fields that hold economy amounts. These are stored as BSON Decimal128
+# instead of plain ints so a single account can hold far more than Mongo's
+# 8-byte (int64) integer ceiling (~9.22 quintillion) without overflowing or
+# corrupting data. Decimal128 supports values up to roughly 10^6144.
+CURRENCY_FIELDS = ("wallet", "bank", "loan_amount", "interest_accrued")
+
+
+def to_decimal128(amount) -> Decimal128:
+    """Converts a Python int/float/Decimal amount into a BSON Decimal128,
+    suitable for use inside a Mongo $inc/$set on a currency field."""
+    return Decimal128(str(int(amount)))
+
+
+def _from_stored_number(value) -> int:
+    """Converts a value read back from Mongo (which may be a plain int, a
+    float from old data, or a Decimal128) into a plain Python int. Python
+    ints have no size limit, so nothing is lost here."""
+    if isinstance(value, Decimal128):
+        return int(value.to_decimal())
+    if value is None:
+        return 0
+    return int(value)
+
+
+def normalize_economy_doc(doc: dict) -> dict:
+    """Converts any Decimal128 currency fields on a raw economy document
+    into plain ints, in place. Call this on any document read directly via
+    eco_col.find()/find_one() (get_user_data already does this)."""
+    if not doc:
+        return doc
+    for field in CURRENCY_FIELDS:
+        if field in doc:
+            doc[field] = _from_stored_number(doc[field])
+    return doc
 
 
 class JailCheckError(commands.CheckFailure):
@@ -17,15 +53,15 @@ def get_user_data(user_id: str) -> dict:
         eco_col.insert_one(user)
 
     if "balance" in user:
-        wallet_amount = user.get("balance", 0)
+        wallet_amount = _from_stored_number(user.get("balance", 0))
         eco_col.update_one(
             {"_id": user_id},
-            {"$set": {"wallet": wallet_amount, "bank": 0}, "$unset": {"balance": ""}},
+            {"$set": {"wallet": to_decimal128(wallet_amount), "bank": to_decimal128(0)}, "$unset": {"balance": ""}},
         )
         user["wallet"] = wallet_amount
         user["bank"] = 0
 
-    return user
+    return normalize_economy_doc(user)
 
 
 _AMOUNT_SUFFIX_MULTIPLIERS = {
@@ -89,11 +125,11 @@ def get_bank(user_id: str) -> int:
 
 
 def update_wallet(user_id: str, amount: int) -> None:
-    eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": amount}}, upsert=True)
+    eco_col.update_one({"_id": user_id}, {"$inc": {"wallet": to_decimal128(amount)}}, upsert=True)
 
 
 def update_bank(user_id: str, amount: int) -> None:
-    eco_col.update_one({"_id": user_id}, {"$inc": {"bank": amount}}, upsert=True)
+    eco_col.update_one({"_id": user_id}, {"$inc": {"bank": to_decimal128(amount)}}, upsert=True)
 
 
 def get_debt(user_id: str) -> int:
@@ -115,11 +151,11 @@ def get_debt(user_id: str) -> int:
 
 
 def update_loan(user_id: str, amount: int) -> None:
-    eco_col.update_one({"_id": user_id}, {"$inc": {"loan_amount": amount}}, upsert=True)
+    eco_col.update_one({"_id": user_id}, {"$inc": {"loan_amount": to_decimal128(amount)}}, upsert=True)
 
 
 def update_interest(user_id: str, amount: int) -> None:
-    eco_col.update_one({"_id": user_id}, {"$inc": {"interest_accrued": amount}}, upsert=True)
+    eco_col.update_one({"_id": user_id}, {"$inc": {"interest_accrued": to_decimal128(amount)}}, upsert=True)
 
 
 def get_prestige_level(net_worth: int) -> int:
@@ -151,7 +187,7 @@ def apply_amortization(user_id: str, income: int) -> int:
         # Pago solo afecta a intereses
         eco_col.update_one(
             {"_id": user_id},
-            {"$inc": {"interest_accrued": -payment}}
+            {"$inc": {"interest_accrued": to_decimal128(-payment)}}
         )
     else:
         # Pago cubre todos los intereses y parte del principal
@@ -160,8 +196,8 @@ def apply_amortization(user_id: str, income: int) -> int:
             {"_id": user_id},
             {
                 "$inc": {
-                    "interest_accrued": -interest,
-                    "loan_amount": -remaining_payment
+                    "interest_accrued": to_decimal128(-interest),
+                    "loan_amount": to_decimal128(-remaining_payment)
                 }
             }
         )
