@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands, tasks
 
 import state
-from config import WELCOME_CHANNEL_ID, ADVENTURE_LOOT
+from config import WELCOME_CHANNEL_ID, RULES_CHANNEL_ID, JOIN_APPLY_CHANNEL_ID, ADVENTURE_LOOT
 from database import eco_col
 from utils.economy import to_decimal128, normalize_economy_doc
 
@@ -43,32 +43,20 @@ class EventsCog(commands.Cog):
         channel = self.bot.get_channel(WELCOME_CHANNEL_ID)
         if not channel:
             return
+        member_count = member.guild.member_count
         embed = discord.Embed(
             title=f"Welcome to the server, {member.name}! \U0001f389",
             description=(
                 f"Hello {member.mention}, we are glad to have you here!\n\n"
-                f"\U0001f4dc **First Step:** Please, read the rules in <#1206222685143826485>\n"
-                f"\u2694\ufe0f **Want to join?** If you want to apply for the clan, go to <#1206198139686617088>\n\n"
+                f"\U0001f4dc **First Step:** Please, read the rules in <#{RULES_CHANNEL_ID}>\n"
+                f"\u2694\ufe0f **Want to join?** If you want to apply for the clan, go to <#{JOIN_APPLY_CHANNEL_ID}>\n\n"
+                f"You are our **{member_count}** member!\n\n"
                 f"Enjoy your stay!"
             ),
             color=0x2B2D31,
         )
-        embed.set_image(url="https://i.ibb.co/d4r7Z6f8/248-AB2-AF-21-F0-4384-A53-D-404328353301.png")
+        embed.set_image(url="https://i.ibb.co/Rd2szwm/1jkdq5x.png")
         await channel.send(content=f"Welcome {member.mention}!", embed=embed)
-
-    @commands.Cog.listener()
-    async def on_member_remove(self, member: discord.Member):
-        if member.bot or not self._should_process_member_event("leave", member.id):
-            return
-        channel = self.bot.get_channel(WELCOME_CHANNEL_ID)
-        if not channel:
-            return
-        embed = discord.Embed(
-            title="Goodbye! \U0001f44b",
-            description=f"**{member.name}** has left the server. We will miss you!",
-            color=0xFF2A2A,
-        )
-        await channel.send(embed=embed)
 
     @tasks.loop(hours=9)
     async def spawn_global_drop(self):
