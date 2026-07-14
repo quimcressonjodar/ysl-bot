@@ -628,15 +628,24 @@ class EconomyCog(commands.Cog):
                 return await ctx.send("❌ Your credit limit is 0 because you have no net worth.", ephemeral=True)
             return await ctx.send("❌ Please specify a positive amount.", ephemeral=True)
             
-        if parsed_amount > 1000000000000: # Technical limit
-            return await ctx.send("❌ That amount is too high even for our bank!", ephemeral=True)
-
         current_debt = get_debt(user_id)
         if current_debt > 0:
             return await ctx.send(f"❌ You already have an active debt of 🪙 {current_debt:,}. Pay it back first!", ephemeral=True)
-            
+
         if parsed_amount > limit:
             return await ctx.send(f"❌ Your credit limit is 🪙 {limit:,} based on your net worth and prestige.", ephemeral=True)
+
+        # No fixed business cap anymore — rich enough players scale past it via
+        # their own net worth-based credit limit. The only remaining ceiling
+        # is MongoDB's storage limit (8-byte int), which would crash the bot
+        # rather than being a real gameplay limit.
+        from config import MAX_ECONOMY_AMOUNT
+        if parsed_amount > MAX_ECONOMY_AMOUNT or wallet + parsed_amount > MAX_ECONOMY_AMOUNT:
+            return await ctx.send(
+                f"❌ Even your credit limit can't be paid out — it would exceed the safe storage limit of "
+                f"🪙 **{MAX_ECONOMY_AMOUNT:,}**. Try a smaller amount.",
+                ephemeral=True,
+            )
             
         # Operación atómica para evitar duplicación
         now = time.time()
