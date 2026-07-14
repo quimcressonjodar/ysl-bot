@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import discord
 from discord.ext import commands
 
-from config import MODMAIL_GUILD_ID, MODMAIL_CHANNEL_ID
+from config import MODMAIL_GUILD_ID, MODMAIL_CHANNEL_ID, MODMAIL_MOD_ROLE_ID
 from database import modmail_col
 
 logger = logging.getLogger("weekly-xp-bot")
@@ -216,9 +216,10 @@ class ModMail(commands.Cog):
 
         try:
             await thread.send(
-                f"📨 **New modmail ticket** — {user.mention} (`{user.id}`)\n"
+                f"<@&{MODMAIL_MOD_ROLE_ID}> 📨 **New modmail ticket** — {user.mention} (`{user.id}`)\n"
                 f"Confirmed by the user. Reply in this thread to respond directly to them. "
-                f"Use `!close` to close the ticket."
+                f"Use `!close` to close the ticket.",
+                allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
             )
         except discord.HTTPException:
             pass
