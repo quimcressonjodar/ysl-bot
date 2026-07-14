@@ -613,14 +613,14 @@ class EconomyCog(commands.Cog):
         # Minimum limit of 50,000 for new/poor players, otherwise use the aggressive ratio
         limit = max(50000, int(net_worth * ratio))
 
-        # Parse amount
-        if amount.lower() in ["max", "all"]:
-            parsed_amount = limit
-        else:
-            try:
-                parsed_amount = int(amount.replace(",", ""))
-            except ValueError:
-                return await ctx.send("❌ Invalid amount. Please use a number or 'max'.", ephemeral=True)
+        # Parse amount (supports "max"/"all", "half", shorthand like "100k"/"2.5m"/"1t",
+        # and scientific notation like "3.72691629e-7")
+        parsed_amount = parse_economy_amount(amount, limit)
+        if parsed_amount == -1:
+            return await ctx.send(
+                "❌ Invalid amount. Please use a number (e.g. `100k`, `2.5m`, `1t`) or 'max'.",
+                ephemeral=True,
+            )
 
         # Validación de entrada
         if parsed_amount <= 0:

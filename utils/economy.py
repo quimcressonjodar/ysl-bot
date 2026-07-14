@@ -1,3 +1,4 @@
+import re
 import time
 from database import eco_col
 from discord.ext import commands
@@ -27,15 +28,55 @@ def get_user_data(user_id: str) -> dict:
     return user
 
 
+_AMOUNT_SUFFIX_MULTIPLIERS = {
+    "k": 1_000,
+    "m": 1_000_000,
+    "b": 1_000_000_000,
+    "t": 1_000_000_000_000,
+    "q": 1_000_000_000_000_000,
+}
+
+# e.g. "100k", "2.5m", "1t"
+_AMOUNT_SUFFIX_PATTERN = re.compile(r"^([+-]?\d+(?:\.\d+)?)([kmbtq])$")
+
+# e.g. "3.72691629e-7", "1.2e9", "-4E3"
+_AMOUNT_SCIENTIFIC_PATTERN = re.compile(r"^[+-]?\d+(?:\.\d+)?e[+-]?\d+$")
+
+
 def parse_economy_amount(amount_input: str, max_balance: int) -> int:
-    amount_input = str(amount_input).lower().strip()
-    if amount_input == "all":
+    """
+    Parses a user-supplied economy amount into an int.
+
+    Accepts, in addition to plain integers:
+      - "all" / "half" / "max" (aliases for the current max_balance)
+      - thousands separators, e.g. "1,000,000"
+      - shorthand suffixes: k=thousand, m=million, b=billion, t=trillion,
+        q=quadrillion, e.g. "100k", "2.5m", "1t"
+      - scientific notation, e.g. "3.72691629e-7", "1.2e9"
+
+    There is no upper limit on the size of number this can parse; callers
+    are responsible for clamping the result against MAX_ECONOMY_AMOUNT
+    before storing it. Returns -1 if the input cannot be parsed at all.
+    """
+    amount_input = str(amount_input).lower().strip().replace(",", "").replace(" ", "")
+    if amount_input in ("all", "max"):
         return max_balance
     if amount_input == "half":
         return max(1, max_balance // 2)
+    if not amount_input:
+        return -1
+
     try:
-        return int(amount_input)
-    except ValueError:
+        suffix_match = _AMOUNT_SUFFIX_PATTERN.match(amount_input)
+        if suffix_match:
+            value, suffix = suffix_match.groups()
+            return int(float(value) * _AMOUNT_SUFFIX_MULTIPLIERS[suffix])
+
+        if _AMOUNT_SCIENTIFIC_PATTERN.match(amount_input):
+            return int(float(amount_input))
+
+        return int(float(amount_input))
+    except (ValueError, OverflowError):
         return -1
 
 
