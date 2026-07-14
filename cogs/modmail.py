@@ -70,15 +70,8 @@ class ModMail(commands.Cog):
         return thread
 
     async def _relay_message_to_thread(self, thread: discord.Thread, message: discord.Message) -> bool:
-        embed = discord.Embed(
-            description=message.content or "*(no text content)*",
-            color=0x5865F2,
-            timestamp=message.created_at,
-        )
-        embed.set_author(
-            name=f"{message.author} ({message.author.id})",
-            icon_url=message.author.display_avatar.url,
-        )
+        content = message.content or "*(no text content)*"
+        text = f"**{message.author.display_name}** ({message.author.id}): {content}"
 
         files = []
         for attachment in message.attachments:
@@ -88,7 +81,7 @@ class ModMail(commands.Cog):
                 pass
 
         try:
-            await thread.send(embed=embed, files=files)
+            await thread.send(text, files=files, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException as e:
             logger.error("Failed to relay DM to modmail thread: %s", e)
             return False
@@ -256,16 +249,8 @@ class ModMail(commands.Cog):
             )
             return
 
-        embed = discord.Embed(
-            description=message.content or "*(no text content)*",
-            color=0x57F287,
-            timestamp=message.created_at,
-        )
-        embed.set_author(
-            name=f"Staff — {message.author.display_name}",
-            icon_url=message.author.display_avatar.url,
-        )
-        embed.set_footer(text="Support Team")
+        content = message.content or "*(no text content)*"
+        text = f"**{message.author.display_name}** (Staff): {content}"
 
         files = []
         for attachment in message.attachments:
@@ -275,7 +260,7 @@ class ModMail(commands.Cog):
                 pass
 
         try:
-            await user.send(embed=embed, files=files)
+            await user.send(text, files=files, allowed_mentions=discord.AllowedMentions.none())
             await message.add_reaction(DELIVERED_EMOJI)
         except discord.Forbidden:
             await message.reply(
