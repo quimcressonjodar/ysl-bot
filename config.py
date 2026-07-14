@@ -14,6 +14,12 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 WELCOME_CHANNEL_ID = 1206229312743809054
 OWNER_IDS = {1436417791615045785, 941697213447421952, 1373879454077685800, 789938929151377428, 1325376607577178123}
 
+# ── Modmail ──────────────────────────────────────────────────────────────────
+# Dedicated staff server + channel where DMs sent to the bot get relayed as
+# threads. Anyone in that server/channel can see and reply to them.
+MODMAIL_GUILD_ID = 1526562448872701962
+MODMAIL_CHANNEL_ID = 1526562649578537111
+
 # Users allowed to use the !impostor command specifically (in addition to OWNER_IDS)
 IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}
 

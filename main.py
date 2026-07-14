@@ -49,6 +49,7 @@ COGS = [
     "cogs.business",
     "cogs.troll",
     "cogs.horserace",
+    "cogs.modmail",
 ]
 
 
