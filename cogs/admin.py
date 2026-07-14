@@ -392,12 +392,17 @@ class AdminCog(commands.Cog):
     @commands.hybrid_command(name="add", description="Add coins to a user (Admin only)")
     @app_commands.describe(member="The member to give coins to", amount="Amount of coins to add")
     @app_commands.default_permissions(administrator=True)
-    async def add(self, ctx: commands.Context, member: discord.Member, amount: int):
+    async def add(self, ctx: commands.Context, member: discord.Member, amount: str):
         if not is_admin(ctx) and ctx.author.id not in ADD_ALLOWED_IDS:
             return await ctx.send("❌ Admin only command.", ephemeral=True)
+        from utils.economy import update_wallet, get_wallet, parse_economy_amount
+        amount = parse_economy_amount(amount, 0)
+        if amount == -1:
+            return await ctx.send(
+                "❌ Invalid amount. Use a number (e.g. `100k`, `2.5m`, `1t`).", ephemeral=True,
+            )
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than 0.", ephemeral=True)
-        from utils.economy import update_wallet, get_wallet
         if amount > MAX_ECONOMY_AMOUNT:
             return await ctx.send(
                 f"❌ That amount is too large. MongoDB can only store numbers up to ~9.2 quintillion "
@@ -423,9 +428,15 @@ class AdminCog(commands.Cog):
     @commands.hybrid_command(name="remove", description="Remove coins from a user's wallet (Admin only)")
     @app_commands.describe(member="The member to remove coins from", amount="Amount of coins to remove")
     @app_commands.default_permissions(administrator=True)
-    async def remove(self, ctx: commands.Context, member: discord.Member, amount: int):
+    async def remove(self, ctx: commands.Context, member: discord.Member, amount: str):
         if not is_admin(ctx):
             return await ctx.send("❌ Admin only command.", ephemeral=True)
+        from utils.economy import update_wallet, get_wallet, parse_economy_amount
+        amount = parse_economy_amount(amount, 0)
+        if amount == -1:
+            return await ctx.send(
+                "❌ Invalid amount. Use a number (e.g. `100k`, `2.5m`, `1t`).", ephemeral=True,
+            )
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than 0.", ephemeral=True)
         if amount > MAX_ECONOMY_AMOUNT:
@@ -433,7 +444,6 @@ class AdminCog(commands.Cog):
                 f"❌ That amount is too large. The max per `!remove` is 🪙 **{MAX_ECONOMY_AMOUNT:,}**.",
                 ephemeral=True,
             )
-        from utils.economy import update_wallet, get_wallet
         current = get_wallet(str(member.id))
         deduct = min(amount, current)
         update_wallet(str(member.id), -deduct)
