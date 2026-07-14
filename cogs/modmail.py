@@ -9,11 +9,15 @@ from database import modmail_col
 
 logger = logging.getLogger("weekly-xp-bot")
 
-# Reacted onto a user's DM once it has actually been delivered to staff.
+# Reacted onto the bot's own confirmation prompt so the user has something
+# to tap. A modmail ticket is only ever opened after the user reacts with
+# this emoji — this stops misdirected/accidental DMs from becoming tickets.
+CONFIRM_EMOJI = "✅"
+
+# Reacted onto a relayed message once it has actually been delivered.
 # This is the only proof of delivery — it cannot be faked by a third party,
-# since only the bot can react as itself, so users can trust that seeing
-# this checkmark means a real staff thread received their message.
-DELIVERED_EMOJI = "✅"
+# since only the bot can react as itself.
+DELIVERED_EMOJI = "☑️"
 
 
 def _safe_thread_name(user: discord.abc.User) -> str:
@@ -23,15 +27,32 @@ def _safe_thread_name(user: discord.abc.User) -> str:
 
 class ModMail(commands.Cog):
     """Relays DMs sent to the bot into threads in a dedicated staff server,
-    and relays staff replies inside those threads back to the user's DMs."""
+    and relays staff replies inside those threads back to the user's DMs.
+
+    Before a ticket is opened, the user must confirm intent by reacting to a
+    prompt from the bot. This filters out accidental/misdirected DMs so
+    staff only see genuine modmail conversations."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
+    # ── Thread helpers ───────────────────────────────────────────────────────
 
-    async def _get_open_thread(self, user: discord.abc.User) -> discord.Thread | None:
-        doc = modmail_col.find_one({"_id": str(user.id), "status": "open"})
+    async def _get_target_channel(self) -> discord.TextChannel | None:
+        channel = self.bot.get_channel(MODMAIL_CHANNEL_ID)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(MODMAIL_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.error("Modmail channel %s not found/accessible.", MODMAIL_CHANNEL_ID)
+                return None
+        if not isinstance(channel, discord.TextChannel):
+            logger.error("Modmail channel %s is not a text channel.", MODMAIL_CHANNEL_ID)
+            return None
+        return channel
+
+    async def _get_open_thread(self, user_id: str) -> discord.Thread | None:
+        doc = modmail_col.find_one({"_id": user_id, "status": "open"})
         if not doc:
             return None
 
@@ -43,69 +64,12 @@ class ModMail(commands.Cog):
                 thread = None
 
         if thread is None or not isinstance(thread, discord.Thread) or thread.archived:
-            # Stale/archived/deleted thread reference — start fresh next time.
-            modmail_col.update_one({"_id": str(user.id)}, {"$set": {"status": "closed"}})
+            modmail_col.update_one({"_id": user_id}, {"$set": {"status": "closed"}})
             return None
 
         return thread
 
-    async def _create_thread(self, user: discord.abc.User) -> discord.Thread | None:
-        channel = self.bot.get_channel(MODMAIL_CHANNEL_ID)
-        if channel is None:
-            try:
-                channel = await self.bot.fetch_channel(MODMAIL_CHANNEL_ID)
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logger.error("Modmail channel %s not found/accessible.", MODMAIL_CHANNEL_ID)
-                return None
-
-        if not isinstance(channel, discord.TextChannel):
-            logger.error("Modmail channel %s is not a text channel.", MODMAIL_CHANNEL_ID)
-            return None
-
-        try:
-            thread = await channel.create_thread(
-                name=_safe_thread_name(user),
-                type=discord.ChannelType.public_thread,
-                reason="Modmail ticket",
-            )
-        except discord.HTTPException as e:
-            logger.error("Failed to create modmail thread for %s: %s", user.id, e)
-            return None
-
-        modmail_col.update_one(
-            {"_id": str(user.id)},
-            {
-                "$set": {
-                    "thread_id": thread.id,
-                    "guild_id": MODMAIL_GUILD_ID,
-                    "status": "open",
-                    "username": str(user),
-                    "opened_at": datetime.now(timezone.utc),
-                }
-            },
-            upsert=True,
-        )
-
-        await thread.send(
-            f"📨 **New modmail ticket** — {user.mention} (`{user.id}`)\n"
-            f"Reply in this thread to respond directly to the user. Use `!close` to close the ticket."
-        )
-        return thread
-
-    async def _forward_dm_to_thread(self, message: discord.Message) -> None:
-        thread = await self._get_open_thread(message.author)
-        is_new = thread is None
-        if thread is None:
-            thread = await self._create_thread(message.author)
-        if thread is None:
-            try:
-                await message.channel.send(
-                    "We couldn't deliver your message to staff right now. Please try again shortly."
-                )
-            except discord.HTTPException:
-                pass
-            return
-
+    async def _relay_message_to_thread(self, thread: discord.Thread, message: discord.Message) -> bool:
         embed = discord.Embed(
             description=message.content or "*(no text content)*",
             color=0x5865F2,
@@ -127,31 +91,157 @@ class ModMail(commands.Cog):
             await thread.send(embed=embed, files=files)
         except discord.HTTPException as e:
             logger.error("Failed to relay DM to modmail thread: %s", e)
+            return False
+        return True
+
+    # ── DM side ──────────────────────────────────────────────────────────────
+
+    async def _send_confirmation_prompt(self, message: discord.Message) -> None:
+        try:
+            prompt = await message.channel.send(
+                "👋 It looks like you're trying to reach our staff team.\n"
+                f"React with {CONFIRM_EMOJI} below to confirm and open a support conversation. "
+                "If you messaged us by mistake, just ignore this."
+            )
+            await prompt.add_reaction(CONFIRM_EMOJI)
+        except discord.HTTPException as e:
+            logger.error("Failed to send modmail confirmation prompt to %s: %s", message.author.id, e)
+            return
+
+        modmail_col.update_one(
+            {"_id": str(message.author.id)},
+            {
+                "$set": {
+                    "status": "pending",
+                    "confirm_message_id": prompt.id,
+                    "dm_channel_id": message.channel.id,
+                    "username": str(message.author),
+                },
+                "$setOnInsert": {"pending_message_ids": []},
+            },
+            upsert=True,
+        )
+        modmail_col.update_one(
+            {"_id": str(message.author.id)},
+            {"$push": {"pending_message_ids": message.id}},
+        )
+
+    async def _handle_dm(self, message: discord.Message) -> None:
+        user_id = str(message.author.id)
+        doc = modmail_col.find_one({"_id": user_id})
+
+        if doc and doc.get("status") == "open":
+            thread = await self._get_open_thread(user_id)
+            if thread is None:
+                # Thread went away (deleted/archived) — ask for confirmation again.
+                await self._send_confirmation_prompt(message)
+                return
+            delivered = await self._relay_message_to_thread(thread, message)
+            if delivered:
+                try:
+                    await message.add_reaction(DELIVERED_EMOJI)
+                except discord.HTTPException:
+                    pass
+            else:
+                try:
+                    await message.channel.send(
+                        "We couldn't deliver your message to staff right now. Please try again shortly."
+                    )
+                except discord.HTTPException:
+                    pass
+            return
+
+        if doc and doc.get("status") == "pending":
+            # Already waiting on the user to confirm — queue this message,
+            # it'll be relayed once they react to the confirmation prompt.
+            modmail_col.update_one({"_id": user_id}, {"$push": {"pending_message_ids": message.id}})
+            return
+
+        # No conversation yet (or the previous one was closed) — ask for confirmation.
+        await self._send_confirmation_prompt(message)
+
+    # ── Confirmation reaction ────────────────────────────────────────────────
+
+    async def _handle_confirmation(self, payload: discord.RawReactionActionEvent) -> None:
+        doc = modmail_col.find_one({"_id": str(payload.user_id), "status": "pending"})
+        if not doc or doc.get("confirm_message_id") != payload.message_id:
+            return
+
+        dm_channel = self.bot.get_channel(payload.channel_id)
+        if dm_channel is None:
             try:
-                await message.channel.send(
-                    "We couldn't deliver your message to staff right now. Please try again shortly."
+                user = self.bot.get_user(payload.user_id) or await self.bot.fetch_user(payload.user_id)
+                dm_channel = user.dm_channel or await user.create_dm()
+            except (discord.NotFound, discord.HTTPException):
+                return
+
+        channel = await self._get_target_channel()
+        if channel is None:
+            try:
+                await dm_channel.send(
+                    "We couldn't open a support conversation right now. Please try again shortly."
                 )
             except discord.HTTPException:
                 pass
             return
 
-        # Verified delivery: react on the user's own DM message. This is the
-        # only confirmation signal — a genuine checkmark from the bot means
-        # the message actually reached a staff thread, so it can't be spoofed.
         try:
-            await message.add_reaction(DELIVERED_EMOJI)
+            user = self.bot.get_user(payload.user_id) or await self.bot.fetch_user(payload.user_id)
+        except (discord.NotFound, discord.HTTPException):
+            return
+
+        try:
+            thread = await channel.create_thread(
+                name=_safe_thread_name(user),
+                type=discord.ChannelType.public_thread,
+                reason="Modmail ticket",
+            )
+        except discord.HTTPException as e:
+            logger.error("Failed to create modmail thread for %s: %s", user.id, e)
+            return
+
+        modmail_col.update_one(
+            {"_id": str(user.id)},
+            {
+                "$set": {
+                    "status": "open",
+                    "thread_id": thread.id,
+                    "guild_id": MODMAIL_GUILD_ID,
+                    "opened_at": datetime.now(timezone.utc),
+                },
+                "$unset": {"confirm_message_id": "", "dm_channel_id": ""},
+            },
+        )
+
+        try:
+            await thread.send(
+                f"📨 **New modmail ticket** — {user.mention} (`{user.id}`)\n"
+                f"Confirmed by the user. Reply in this thread to respond directly to them. "
+                f"Use `!close` to close the ticket."
+            )
         except discord.HTTPException:
             pass
 
-        if is_new:
+        # Relay every message the user sent while awaiting confirmation, in order.
+        pending_ids = doc.get("pending_message_ids") or []
+        for msg_id in pending_ids:
             try:
-                await message.channel.send(
-                    "Thank you for contacting us. Your message has been forwarded to our staff team, "
-                    "and you'll receive replies right here in this DM. A ✅ reaction on your message "
-                    "confirms it was delivered to staff."
-                )
-            except discord.HTTPException:
-                pass
+                original = await dm_channel.fetch_message(msg_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                continue
+            await self._relay_message_to_thread(thread, original)
+
+        modmail_col.update_one({"_id": str(user.id)}, {"$set": {"pending_message_ids": []}})
+
+        try:
+            await dm_channel.send(
+                "✅ Confirmed. Your message has been forwarded to our staff team, and you'll receive "
+                "replies right here in this DM."
+            )
+        except discord.HTTPException:
+            pass
+
+    # ── Staff side ───────────────────────────────────────────────────────────
 
     async def _forward_thread_to_dm(self, message: discord.Message) -> None:
         doc = modmail_col.find_one({"thread_id": message.channel.id, "status": "open"})
@@ -186,8 +276,6 @@ class ModMail(commands.Cog):
 
         try:
             await user.send(embed=embed, files=files)
-            # Verified delivery: react on the staff message so the team can
-            # see at a glance that the reply actually reached the user.
             await message.add_reaction(DELIVERED_EMOJI)
         except discord.Forbidden:
             await message.reply(
@@ -197,21 +285,19 @@ class ModMail(commands.Cog):
         except discord.HTTPException as e:
             logger.error("Failed to relay thread reply to DM: %s", e)
 
-    # ── Listener ─────────────────────────────────────────────────────────────
+    # ── Listeners ────────────────────────────────────────────────────────────
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
 
-        # DM to the bot -> forward to (or open) the user's modmail thread.
         if message.guild is None:
             if not message.content.strip() and not message.attachments:
                 return
-            await self._forward_dm_to_thread(message)
+            await self._handle_dm(message)
             return
 
-        # Staff reply inside a modmail thread -> forward to the user's DM.
         if (
             message.guild.id == MODMAIL_GUILD_ID
             and isinstance(message.channel, discord.Thread)
@@ -219,6 +305,16 @@ class ModMail(commands.Cog):
             and not message.content.startswith(self.bot.command_prefix)
         ):
             await self._forward_thread_to_dm(message)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        if payload.guild_id is not None:
+            return  # confirmations only happen in DMs
+        if payload.user_id == self.bot.user.id:
+            return
+        if str(payload.emoji) != CONFIRM_EMOJI:
+            return
+        await self._handle_confirmation(payload)
 
     # ── Commands ─────────────────────────────────────────────────────────────
 
