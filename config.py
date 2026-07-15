@@ -23,7 +23,7 @@ MODMAIL_GUILD_ID = 1526562448872701962
 MODMAIL_CHANNEL_ID = 1526562649578537111
 MODMAIL_MOD_ROLE_ID = 1526574388906823831
 # Channel where a full HTML transcript + summary embed is posted once a modmail ticket is closed.
-MODMAIL_TRANSCRIPT_CHANNEL_ID = 1515727974987464734
+MODMAIL_TRANSCRIPT_CHANNEL_ID = 1526926325695250523
 
 # ── Server boosts ────────────────────────────────────────────────────────────
 # Channel where a thank-you message is posted whenever a member boosts the server.

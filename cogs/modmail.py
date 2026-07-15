@@ -40,7 +40,23 @@ def _build_transcript_html(thread: discord.Thread, messages: list[discord.Messag
         ts = message.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
         author = html.escape(str(message.author))
         avatar = message.author.display_avatar.url
-        content = html.escape(message.content or "").replace("\n", "<br>")
+
+        # Relayed modmail messages are sent as embeds (not plain content), so
+        # fall back to the embed's text when the message itself has none.
+        text = message.content or ""
+        if not text and message.embeds:
+            parts = []
+            for embed in message.embeds:
+                if embed.author and embed.author.name:
+                    parts.append(embed.author.name)
+                if embed.description:
+                    parts.append(embed.description)
+                for field in embed.fields:
+                    parts.append(f"{field.name}: {field.value}")
+                if embed.footer and embed.footer.text:
+                    parts.append(f"— {embed.footer.text}")
+            text = "\n".join(parts)
+        content = html.escape(text).replace("\n", "<br>")
 
         attachments_html = ""
         if message.attachments:
