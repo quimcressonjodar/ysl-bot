@@ -54,20 +54,12 @@ def get_next_warn_id() -> int:
 
 def can_moderate(ctx: commands.Context, member: discord.Member) -> str | None:
     """
-    Shared safety/hierarchy checks for moderation commands.
+    Shared safety checks for moderation commands.
+    Anyone can be moderated — owners, admins, and even the moderator
+    themselves are not protected. The only hard block left is the bot's own
+    account, since it can't meaningfully ban/kick/warn/timeout itself.
     Returns an error message if the action should be blocked, or None if it's allowed.
     """
-    if member.id == ctx.author.id:
-        return "❌ You can't use this on yourself."
     if member.id == ctx.bot.user.id:
         return "❌ I can't use this on myself."
-    if member.id in OWNER_IDS:
-        return "❌ This user is protected and cannot be moderated."
-    if ctx.guild.owner_id == member.id:
-        return "❌ You can't moderate the server owner."
-    if ctx.author.id not in OWNER_IDS:
-        if member.top_role >= ctx.author.top_role:
-            return "❌ You can't moderate someone with an equal or higher role than you."
-    if member.top_role >= ctx.guild.me.top_role:
-        return "❌ I can't moderate this user — their role is equal to or higher than mine."
     return None
