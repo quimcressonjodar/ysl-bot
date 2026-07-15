@@ -1,12 +1,19 @@
 import random
 import time
 import logging
+from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands, tasks
 
 import state
-from config import WELCOME_CHANNEL_ID, RULES_CHANNEL_ID, JOIN_APPLY_CHANNEL_ID, ADVENTURE_LOOT
+from config import (
+    WELCOME_CHANNEL_ID,
+    RULES_CHANNEL_ID,
+    JOIN_APPLY_CHANNEL_ID,
+    ADVENTURE_LOOT,
+    BOOST_THANKS_CHANNEL_ID,
+)
 from database import eco_col
 from utils.economy import to_decimal128, normalize_economy_doc
 
@@ -14,6 +21,7 @@ logger = logging.getLogger("weekly-xp-bot")
 
 GLOBAL_DROP_CHANNEL_ID = 1513755454029959239
 GLOBAL_DROP_COIN_REWARDS = [50000, 75000, 100000, 125000, 150000, 200000]
+BOOST_COLOR = 0xF47FFF
 
 
 class EventsCog(commands.Cog):
@@ -57,6 +65,42 @@ class EventsCog(commands.Cog):
         )
         embed.set_image(url="https://i.ibb.co/Rd2szwm/1jkdq5x.png")
         await channel.send(content=f"Welcome {member.mention}!", embed=embed)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        # Discord itself generates a system message when a member boosts the
+        # server; its (usually hidden) content holds the boost count when a
+        # member applies more than one boost at once.
+        if message.type != discord.MessageType.premium_guild_subscription:
+            return
+
+        channel = self.bot.get_channel(BOOST_THANKS_CHANNEL_ID)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(BOOST_THANKS_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.error("Boost thanks channel %s not found/accessible.", BOOST_THANKS_CHANNEL_ID)
+                return
+
+        times = int(message.content) if message.content and message.content.isdigit() else 1
+        times_text = f"**{times}** time" + ("s" if times != 1 else "")
+
+        embed = discord.Embed(
+            description=f"Thank you for boosting the server {times_text}, {message.author.mention}! \U0001f49c",
+            color=BOOST_COLOR,
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.set_thumbnail(url=message.author.display_avatar.url)
+        embed.set_footer(text="Server Boost")
+
+        try:
+            await channel.send(
+                content=message.author.mention,
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(users=True),
+            )
+        except discord.HTTPException as e:
+            logger.error("Failed to send boost thank-you message: %s", e)
 
     @tasks.loop(hours=9)
     async def spawn_global_drop(self):

@@ -1,10 +1,17 @@
+import html
+import io
 import logging
 from datetime import datetime, timezone
 
 import discord
 from discord.ext import commands
 
-from config import MODMAIL_GUILD_ID, MODMAIL_CHANNEL_ID, MODMAIL_MOD_ROLE_ID
+from config import (
+    MODMAIL_GUILD_ID,
+    MODMAIL_CHANNEL_ID,
+    MODMAIL_MOD_ROLE_ID,
+    MODMAIL_TRANSCRIPT_CHANNEL_ID,
+)
 from database import modmail_col
 
 logger = logging.getLogger("weekly-xp-bot")
@@ -23,6 +30,58 @@ DELIVERED_EMOJI = "☑️"
 def _safe_thread_name(user: discord.abc.User) -> str:
     name = f"{user.name} ({user.id})"
     return name[:100]
+
+
+def _build_transcript_html(thread: discord.Thread, messages: list[discord.Message]) -> str:
+    """Renders the ticket's message history as a simple, self-contained HTML file
+    styled to loosely resemble Discord's own dark theme."""
+    rows = []
+    for message in messages:
+        ts = message.created_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+        author = html.escape(str(message.author))
+        avatar = message.author.display_avatar.url
+        content = html.escape(message.content or "").replace("\n", "<br>")
+
+        attachments_html = ""
+        if message.attachments:
+            links = "".join(
+                f'<div><a href="{html.escape(a.url)}" target="_blank">📎 {html.escape(a.filename)}</a></div>'
+                for a in message.attachments
+            )
+            attachments_html = f'<div class="attachments">{links}</div>'
+
+        rows.append(
+            f'<div class="message">'
+            f'<img class="avatar" src="{avatar}">'
+            f'<div class="body">'
+            f'<div class="meta"><span class="author">{author}</span>'
+            f'<span class="timestamp">{ts}</span></div>'
+            f'<div class="content">{content}</div>'
+            f"{attachments_html}"
+            f"</div></div>"
+        )
+
+    body = "\n".join(rows) if rows else '<p style="color:#949ba4;">No messages were recorded in this ticket.</p>'
+
+    return (
+        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        f"<title>Transcript - {html.escape(thread.name)}</title>"
+        "<style>"
+        "body{background:#313338;color:#dbdee1;font-family:'gg sans','Helvetica Neue',Arial,sans-serif;"
+        "margin:0;padding:24px;}"
+        "h1{color:#fff;font-size:20px;border-bottom:1px solid #3f4147;padding-bottom:12px;}"
+        ".message{display:flex;gap:14px;margin-top:16px;}"
+        ".avatar{width:40px;height:40px;border-radius:50%;flex-shrink:0;}"
+        ".meta{font-size:13px;margin-bottom:3px;}"
+        ".author{font-weight:600;color:#fff;}"
+        ".timestamp{color:#949ba4;font-size:12px;margin-left:8px;}"
+        ".content{font-size:15px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}"
+        ".attachments a{color:#00a8fc;text-decoration:none;font-size:14px;}"
+        "</style></head><body>"
+        f"<h1>📄 Transcript — {html.escape(thread.name)}</h1>"
+        f"{body}"
+        "</body></html>"
+    )
 
 
 class ModMail(commands.Cog):
@@ -340,19 +399,82 @@ class ModMail(commands.Cog):
         )
 
         try:
-            user = self.bot.get_user(int(doc["_id"])) or await self.bot.fetch_user(int(doc["_id"]))
-            await user.send(
-                "This conversation has been closed by our staff team. "
-                "If you need anything else, feel free to message us again."
-            )
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            pass
+            owner = self.bot.get_user(int(doc["_id"])) or await self.bot.fetch_user(int(doc["_id"]))
+        except (discord.NotFound, discord.HTTPException):
+            owner = None
+
+        if owner is not None:
+            try:
+                await owner.send(
+                    "This conversation has been closed by our staff team. "
+                    "If you need anything else, feel free to message us again."
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                pass
 
         await ctx.send("✅ Ticket closed.")
+        await self._post_transcript(ctx.channel, doc, owner, closed_by=ctx.author)
+
         try:
             await ctx.channel.edit(archived=True, locked=True)
         except discord.HTTPException:
             pass
+
+    async def _post_transcript(
+        self,
+        thread: discord.Thread,
+        doc: dict,
+        owner: discord.abc.User | None,
+        closed_by: discord.abc.User,
+    ) -> None:
+        try:
+            messages = [m async for m in thread.history(limit=None, oldest_first=True)]
+        except discord.HTTPException as e:
+            logger.error("Failed to fetch modmail thread history for transcript: %s", e)
+            messages = []
+
+        transcript_html = _build_transcript_html(thread, messages)
+        transcript_file = discord.File(
+            io.BytesIO(transcript_html.encode("utf-8")),
+            filename=f"transcript-{thread.id}.html",
+        )
+
+        counts: dict[int, dict] = {}
+        for message in messages:
+            entry = counts.setdefault(message.author.id, {"user": message.author, "count": 0})
+            entry["count"] += 1
+        sorted_counts = sorted(counts.values(), key=lambda c: c["count"], reverse=True)
+        users_lines = [f"{c['count']} - {c['user'].mention} - {c['user']}" for c in sorted_counts[:15]]
+        users_text = "\n".join(users_lines) if users_lines else "No participants recorded."
+
+        embed = discord.Embed(color=0x5865F2, timestamp=datetime.now(timezone.utc))
+        embed.set_author(
+            name=str(owner) if owner else doc.get("username", "Unknown user"),
+            icon_url=owner.display_avatar.url if owner else discord.Embed.Empty,
+        )
+        embed.add_field(
+            name="Ticket Owner",
+            value=owner.mention if owner else f"`{doc['_id']}`",
+            inline=False,
+        )
+        embed.add_field(name="Ticket Name", value=thread.name, inline=False)
+        embed.add_field(name="Panel Name", value="Direct Message Modmail", inline=False)
+        embed.add_field(name="Closed By", value=closed_by.mention, inline=False)
+        embed.add_field(name="Users in Transcript", value=users_text[:1024], inline=False)
+        embed.set_footer(text=f"{len(messages)} messages")
+
+        channel = self.bot.get_channel(MODMAIL_TRANSCRIPT_CHANNEL_ID)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(MODMAIL_TRANSCRIPT_CHANNEL_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.error("Modmail transcript channel %s not found/accessible.", MODMAIL_TRANSCRIPT_CHANNEL_ID)
+                return
+
+        try:
+            await channel.send(embed=embed, file=transcript_file)
+        except discord.HTTPException as e:
+            logger.error("Failed to post modmail transcript: %s", e)
 
 
 async def setup(bot: commands.Bot):

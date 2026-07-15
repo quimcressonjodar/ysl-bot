@@ -22,6 +22,12 @@ OWNER_IDS = {1436417791615045785, 941697213447421952, 1373879454077685800, 78993
 MODMAIL_GUILD_ID = 1526562448872701962
 MODMAIL_CHANNEL_ID = 1526562649578537111
 MODMAIL_MOD_ROLE_ID = 1526574388906823831
+# Channel where a full HTML transcript + summary embed is posted once a modmail ticket is closed.
+MODMAIL_TRANSCRIPT_CHANNEL_ID = 1515727974987464734
+
+# ── Server boosts ────────────────────────────────────────────────────────────
+# Channel where a thank-you message is posted whenever a member boosts the server.
+BOOST_THANKS_CHANNEL_ID = 1524353296704340048
 
 # Users allowed to use the !impostor command specifically (in addition to OWNER_IDS)
 IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}
