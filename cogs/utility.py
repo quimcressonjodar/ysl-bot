@@ -227,10 +227,37 @@ REFERENCE_EMBED = _e(
         ),
         (
             "⭐ Prestige & Stats",
-            "`!balance` — shows your prestige level (based on total net worth)\n"
+            "`!prestige` — see every wealth milestone and which ones you've unlocked\n"
+            "`!balance` — also shows your current prestige level (based on total net worth)\n"
             "Higher prestige = lower stock trading fees (up to −90% at max rank)\n"
             "`!botstats` — bot ping, uptime, server count\n"
             "`!tutorial` — restart the interactive step-by-step walkthrough",
+        ),
+        (
+            "🎲 More Games",
+            "`!bjpvp @user <bet>` — challenge another player to a 1v1 blackjack duel\n"
+            "`!8ball <question>` — ask the magic 8-ball a question",
+        ),
+        (
+            "🏇 Horse Race",
+            "`!horserace` or `!horserace start` — open betting on a new multiplayer race\n"
+            "`!horserace bet <horse 1-5> <amount>` — bet on a horse before betting closes",
+        ),
+        (
+            "🏢 Business Empire",
+            "`!business shop` — browse business types you can open\n"
+            "`!business buy <type> [name]` — open a new business\n"
+            "`!business list` — see all businesses you own\n"
+            "`!business info <id>` — full stats for one business\n"
+            "`!business collect` — collect income from your businesses\n"
+            "`!business upgrade <id> <upgrade>` — upgrade a business\n"
+            "`!business hire <id>` / `!business fire <id> <worker>` — manage workers\n"
+            "`!business help` — full list of every business subcommand",
+        ),
+        (
+            "📬 Modmail",
+            "DM the bot directly to start a private conversation with staff.\n"
+            "`!close` — (staff, inside a ticket thread) closes the modmail ticket",
         ),
     ],
 )

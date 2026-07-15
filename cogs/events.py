@@ -53,7 +53,7 @@ class EventsCog(commands.Cog):
                 f"You are our **{member_count}** member!\n\n"
                 f"Enjoy your stay!"
             ),
-            color=0x2B2D31,
+            color=0x8B0000,
         )
         embed.set_image(url="https://i.ibb.co/Rd2szwm/1jkdq5x.png")
         await channel.send(content=f"Welcome {member.mention}!", embed=embed)

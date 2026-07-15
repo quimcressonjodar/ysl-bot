@@ -227,7 +227,7 @@ class AdminCog(commands.Cog):
     @commands.hybrid_command(name="warn", description="Issue a warning to a member (Admin only)")
     @app_commands.describe(member="The member to warn", reason="The reason for the warning")
     @app_commands.default_permissions(administrator=True)
-    async def warn(self, ctx: commands.Context, member: discord.Member, reason: str):
+    async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str):
         if not is_admin(ctx):
             return await ctx.send("❌ You do not have permission to use this command.", ephemeral=True)
         block_reason = can_moderate(ctx, member)
@@ -364,30 +364,91 @@ class AdminCog(commands.Cog):
             await ctx.send("Message sent!", ephemeral=True)
             await ctx.channel.send(message)
 
-    @commands.hybrid_command(name="sayembed", description="Send a custom embed message (Admin only)")
+    # Friendly color names on top of raw hex codes, so admins don't have to
+    # look up a hex value for common choices.
+    EMBED_COLOR_NAMES = {
+        "blurple": 0x5865F2, "blood red": 0x8B0000, "bloodred": 0x8B0000,
+        "red": 0xE02B2B, "green": 0x2ECC71, "blue": 0x3498DB, "yellow": 0xF1C40F,
+        "orange": 0xE67E22, "purple": 0x9B59B6, "pink": 0xEB459E, "gold": 0xFFD700,
+        "black": 0x23272A, "white": 0xFFFFFF, "grey": 0x2B2D31, "gray": 0x2B2D31,
+        "teal": 0x1ABC9C, "cyan": 0x00FFFF,
+    }
+
+    def _resolve_embed_color(self, color: str) -> int:
+        key = color.strip().lower()
+        if key in self.EMBED_COLOR_NAMES:
+            return self.EMBED_COLOR_NAMES[key]
+        try:
+            return int(color.lstrip("#"), 16)
+        except ValueError:
+            return 0x2B2D31
+
+    @commands.hybrid_command(
+        name="sayembed",
+        description="Send a fully customizable embed message (Admin only)",
+    )
     @app_commands.describe(
         title="Title of the embed",
-        description="The main text of the embed",
-        color="Hex color code (e.g. 2b2d31 or ff0000)",
+        description="The main text of the embed (use \\n for new lines)",
+        color="Color name (e.g. blood red, blurple, gold) or hex code (e.g. ff0000)",
+        footer="Small text shown at the bottom of the embed",
+        image_url="Big image shown at the bottom of the embed",
+        thumbnail_url="Small image shown in the top-right corner",
+        author_name="Text shown above the title, with a small icon",
+        author_icon_url="Icon shown next to the author text (needs author_name)",
+        url="Makes the title clickable, linking to this URL",
+        timestamp="Add the current date/time to the embed footer",
+        channel="Channel to send the embed to (defaults to this channel)",
     )
     @app_commands.default_permissions(administrator=True)
-    async def sayembed(self, ctx: commands.Context, title: str, description: str, color: str = "2b2d31"):
+    async def sayembed(
+        self,
+        ctx: commands.Context,
+        title: str,
+        description: str,
+        color: str = "blurple",
+        footer: str = None,
+        image_url: str = None,
+        thumbnail_url: str = None,
+        author_name: str = None,
+        author_icon_url: str = None,
+        url: str = None,
+        timestamp: bool = False,
+        channel: discord.TextChannel = None,
+    ):
         if not is_admin(ctx):
             return await ctx.send("Admin only command.", ephemeral=True)
-        try:
-            color_int = int(color.lstrip("#"), 16)
-        except ValueError:
-            color_int = 0x2B2D31
-        embed = discord.Embed(title=title, description=description, color=color_int)
+
+        color_int = self._resolve_embed_color(color)
+        description = description.replace("\\n", "\n")
+
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=color_int,
+            url=url,
+            timestamp=datetime.now(timezone.utc) if timestamp else None,
+        )
+        if footer:
+            embed.set_footer(text=footer)
+        if image_url:
+            embed.set_image(url=image_url)
+        if thumbnail_url:
+            embed.set_thumbnail(url=thumbnail_url)
+        if author_name:
+            embed.set_author(name=author_name, icon_url=author_icon_url)
+
+        target = channel or ctx.channel
+
         if ctx.interaction is None:
             try:
                 await ctx.message.delete()
             except discord.Forbidden:
                 pass
-            await ctx.send(embed=embed)
+            await target.send(embed=embed)
         else:
-            await ctx.send("Embed sent!", ephemeral=True)
-            await ctx.channel.send(embed=embed)
+            await ctx.send(f"Embed sent to {target.mention}!", ephemeral=True)
+            await target.send(embed=embed)
 
     @commands.hybrid_command(name="add", description="Add coins to a user (Admin only)")
     @app_commands.describe(member="The member to give coins to", amount="Amount of coins to add")
