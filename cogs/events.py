@@ -102,6 +102,11 @@ class EventsCog(commands.Cog):
         except discord.HTTPException as e:
             logger.error("Failed to send boost thank-you message: %s", e)
 
+        try:
+            await message.delete()
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            pass  # Already deleted or no permission — not critical
+
     @tasks.loop(hours=9)
     async def spawn_global_drop(self):
         channel = self.bot.get_channel(GLOBAL_DROP_CHANNEL_ID)
