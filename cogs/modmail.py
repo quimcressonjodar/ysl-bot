@@ -228,9 +228,10 @@ class ModMail(commands.Cog):
             return
 
         if doc and doc.get("status") == "pending":
-            # Already waiting on the user to confirm — queue this message,
-            # it'll be relayed once they react to the confirmation prompt.
-            modmail_col.update_one({"_id": user_id}, {"$push": {"pending_message_ids": message.id}})
+            # The user sent another message without reacting to the confirmation
+            # prompt. Re-send it so they have a fresh ✅ to tap, and queue this
+            # message so it's relayed once they confirm.
+            await self._send_confirmation_prompt(message)
             return
 
         # No conversation yet (or the previous one was closed) — ask for confirmation.
