@@ -68,10 +68,18 @@ class EventsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        # Discord itself generates a system message when a member boosts the
-        # server; its (usually hidden) content holds the boost count when a
-        # member applies more than one boost at once.
-        if message.type != discord.MessageType.premium_guild_subscription:
+        # Discord sends different message types depending on whether the boost
+        # also triggers a server level-up:
+        #   premium_guild_subscription  → plain boost (no level change)
+        #   premium_guild_tier_1/2/3    → boost that pushed the server to a new level
+        # All four types must be handled so level-up boosts are never missed.
+        BOOST_TYPES = {
+            discord.MessageType.premium_guild_subscription,
+            discord.MessageType.premium_guild_tier_1,
+            discord.MessageType.premium_guild_tier_2,
+            discord.MessageType.premium_guild_tier_3,
+        }
+        if message.type not in BOOST_TYPES:
             return
 
         channel = self.bot.get_channel(BOOST_THANKS_CHANNEL_ID)
