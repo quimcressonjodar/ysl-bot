@@ -118,6 +118,31 @@ class YSLBot(commands.Bot):
 
         self.add_check(jail_check)
 
+    async def on_command(self, ctx: commands.Context):
+        """Log every command invocation to MongoDB."""
+        if not ctx.guild or not ctx.command:
+            return
+        try:
+            from utils.logger import log_action
+            cog_name = (ctx.cog.__class__.__name__ or "").lower()
+            if any(k in cog_name for k in ("economy", "stock", "bounty", "business")):
+                log_type = "economy"
+            elif any(k in cog_name for k in ("admin", "mod")):
+                log_type = "moderation"
+            else:
+                log_type = "command"
+            log_action(
+                guild_id=ctx.guild.id,
+                log_type=log_type,
+                action=ctx.command.qualified_name,
+                actor_id=ctx.author.id,
+                actor_name=str(ctx.author),
+                channel_id=ctx.channel.id if ctx.channel else None,
+                channel_name=ctx.channel.name if ctx.channel else None,
+            )
+        except Exception:
+            pass
+
     async def on_ready(self):
         logger.info(f"✅ Bot connected as {self.user}!")
         await self.change_presence(

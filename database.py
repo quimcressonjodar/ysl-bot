@@ -18,3 +18,11 @@ modmail_col = db["modmail"]
 # Dashboard collections
 bot_guilds_col = db["bot_guilds"]
 dashboard_modules_col = db["dashboard_modules"]
+bot_logs_col = db["bot_logs"]
+
+# Index for efficient log queries (newest first per guild)
+try:
+    bot_logs_col.create_index([("guild_id", 1), ("timestamp", -1)])
+    bot_logs_col.create_index([("guild_id", 1), ("type", 1), ("timestamp", -1)])
+except Exception:
+    pass

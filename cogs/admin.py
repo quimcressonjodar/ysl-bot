@@ -43,6 +43,15 @@ class AdminCog(commands.Cog):
         except Exception as e:
             return await ctx.send(f"❌ Failed to ban **{member}**: {e}", ephemeral=True)
 
+        try:
+            from utils.logger import log_action
+            log_action(guild_id=ctx.guild.id, log_type="moderation", action="ban",
+                       actor_id=ctx.author.id, actor_name=str(ctx.author),
+                       target_id=member.id, target_name=str(member), reason=reason,
+                       channel_id=ctx.channel.id, channel_name=ctx.channel.name)
+        except Exception:
+            pass
+
         embed = discord.Embed(title="🔨 Member Banned", color=0xE02B2B, timestamp=datetime.now(timezone.utc))
         embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
         embed.add_field(name="Reason", value=reason, inline=False)
@@ -125,6 +134,15 @@ class AdminCog(commands.Cog):
             await member.kick(reason=f"{reason} | Moderator: {ctx.author}")
         except Exception as e:
             return await ctx.send(f"❌ Failed to kick **{member}**: {e}", ephemeral=True)
+
+        try:
+            from utils.logger import log_action
+            log_action(guild_id=ctx.guild.id, log_type="moderation", action="kick",
+                       actor_id=ctx.author.id, actor_name=str(ctx.author),
+                       target_id=member.id, target_name=str(member), reason=reason,
+                       channel_id=ctx.channel.id, channel_name=ctx.channel.name)
+        except Exception:
+            pass
 
         embed = discord.Embed(title="👢 Member Kicked", color=0xE67E22, timestamp=datetime.now(timezone.utc))
         embed.add_field(name="User", value=f"{member.mention} (`{member.id}`)", inline=False)
@@ -249,6 +267,15 @@ class AdminCog(commands.Cog):
         }
         warns_data[user_id].append(new_warn)
         save_warns(warns_data)
+
+        try:
+            from utils.logger import log_action
+            log_action(guild_id=ctx.guild.id, log_type="moderation", action="warn",
+                       actor_id=ctx.author.id, actor_name=str(ctx.author),
+                       target_id=member.id, target_name=str(member), reason=reason,
+                       channel_id=ctx.channel.id, channel_name=ctx.channel.name)
+        except Exception:
+            pass
 
         dm_sent = True
         try:

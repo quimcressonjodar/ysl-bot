@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Blueprint, redirect, request, session, url_for
+from flask import Blueprint, redirect, request, session
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -11,11 +11,20 @@ SCOPES = "identify guilds"
 
 
 def _redirect_uri():
-    """Build the OAuth callback URI dynamically from Render's env or request host."""
-    base = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
-    if not base:
-        base = request.url_root.rstrip("/")
-    return f"{base}/callback"
+    """
+    Build the OAuth callback URI.
+
+    Priority:
+    1. DASHBOARD_URL env var  (set this in Render: e.g. https://ysl-bot.onrender.com)
+    2. RENDER_EXTERNAL_URL    (auto-set by Render, may not always be available)
+    3. request.url_root       (last resort, may use http:// — usually wrong in prod)
+    """
+    base = (
+        os.getenv("DASHBOARD_URL")
+        or os.getenv("RENDER_EXTERNAL_URL")
+        or request.url_root
+    )
+    return base.rstrip("/") + "/callback"
 
 
 @auth_bp.route("/login")
@@ -39,7 +48,6 @@ def callback():
 
     redirect_uri = _redirect_uri()
 
-    # Exchange code for access token
     token_resp = requests.post(
         f"{DISCORD_API}/oauth2/token",
         data={
@@ -60,7 +68,6 @@ def callback():
     if not access_token:
         return redirect("/")
 
-    # Fetch user info
     user_resp = requests.get(
         f"{DISCORD_API}/users/@me",
         headers={"Authorization": f"Bearer {access_token}"},
