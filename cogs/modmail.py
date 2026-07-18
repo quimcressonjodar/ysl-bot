@@ -491,14 +491,34 @@ class ModMail(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
-        await ctx.send("✅ Ticket closed. Posting transcript and deleting channel…")
+        await ctx.send("✅ Ticket closed. Posting transcript…")
         await self._post_transcript(ctx.channel, doc, owner, closed_by=ctx.author)
 
-        # Delete the channel now that the transcript has been saved
+    @commands.hybrid_command(name="delete", description="Delete the current modmail ticket channel")
+    async def delete(self, ctx: commands.Context):
+        if not (
+            ctx.guild
+            and ctx.guild.id == MODMAIL_GUILD_ID
+            and isinstance(ctx.channel, discord.TextChannel)
+            and ctx.channel.category_id == MODMAIL_CATEGORY_ID
+        ):
+            return await ctx.send("This command can only be used inside a modmail ticket channel.", ephemeral=True)
+
+        doc = modmail_col.find_one({"thread_id": ctx.channel.id})
+        if not doc:
+            return await ctx.send("This channel isn't registered as a modmail ticket.", ephemeral=True)
+
+        if doc.get("status") == "open":
+            return await ctx.send(
+                "This ticket is still open. Use `!close` first before deleting the channel.",
+                ephemeral=True,
+            )
+
+        await ctx.send("🗑️ Deleting channel…")
         try:
-            await ctx.channel.delete(reason="Modmail ticket closed")
+            await ctx.channel.delete(reason=f"Modmail ticket deleted by {ctx.author}")
         except discord.HTTPException as e:
-            logger.error("Failed to delete modmail channel after close: %s", e)
+            logger.error("Failed to delete modmail channel: %s", e)
 
     async def _post_transcript(
         self,
