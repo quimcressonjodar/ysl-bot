@@ -55,11 +55,10 @@ def get_next_warn_id() -> int:
 def can_moderate(ctx: commands.Context, member: discord.Member) -> str | None:
     """
     Shared safety checks for moderation commands.
-    Anyone can be moderated — owners, admins, and even the moderator
-    themselves are not protected. The only hard block left is the bot's own
-    account, since it can't meaningfully ban/kick/warn/timeout itself.
     Returns an error message if the action should be blocked, or None if it's allowed.
     """
     if member.id == ctx.bot.user.id:
         return "❌ I can't use this on myself."
+    if member.id in OWNER_IDS:
+        return "❌ That user is protected and cannot be warned, kicked, banned, or timed out."
     return None
