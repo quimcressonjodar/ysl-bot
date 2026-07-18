@@ -218,14 +218,14 @@ class ModMail(commands.Cog):
                     "confirm_message_id": prompt.id,
                     "dm_channel_id": message.channel.id,
                     "username": str(message.author),
+                    # Replace any previously queued messages with only this one.
+                    # If the user sent messages earlier without confirming, those
+                    # are discarded — staff only receive the message that actually
+                    # prompted the user to open the ticket.
+                    "pending_message_ids": [message.id],
                 },
-                "$setOnInsert": {"pending_message_ids": []},
             },
             upsert=True,
-        )
-        modmail_col.update_one(
-            {"_id": str(message.author.id)},
-            {"$push": {"pending_message_ids": message.id}},
         )
 
     async def _handle_dm(self, message: discord.Message) -> None:
