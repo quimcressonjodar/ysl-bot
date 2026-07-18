@@ -10,4 +10,4 @@ pillow
 openai
 matplotlib
 pandas
-pillow
+requests

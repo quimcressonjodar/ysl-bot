@@ -14,3 +14,7 @@ tutorial_col = db["tutorials"]
 bot_state_col = db["bot_state"]
 businesses_col = db["businesses"]
 modmail_col = db["modmail"]
+
+# Dashboard collections
+bot_guilds_col = db["bot_guilds"]
+dashboard_modules_col = db["dashboard_modules"]

@@ -1,31 +1,56 @@
 import asyncio
 import logging
+import os
 
 import discord
 from discord.ext import commands
-from flask import Flask
+from flask import Flask, send_from_directory
 from threading import Thread
 
 from config import DISCORD_TOKEN
+from database import bot_guilds_col
+from dashboard import auth_bp, api_bp
 
 logger = logging.getLogger("weekly-xp-bot")
 
-app = Flask("")
+# ── Flask app ─────────────────────────────────────────────────────────────────
 
+app = Flask(__name__, static_folder=None)
+app.secret_key = os.getenv("DASHBOARD_SECRET_KEY", "change-me-in-production")
 
-@app.route("/")
-def home():
-    return "Bot activo"
+# Register blueprints
+app.register_blueprint(auth_bp)
+app.register_blueprint(api_bp)
+
+# Serve built React static assets
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "dashboard", "static")
+
+@app.route("/assets/<path:filename>")
+def static_assets(filename):
+    return send_from_directory(os.path.join(STATIC_DIR, "assets"), filename)
+
+@app.route("/favicon.svg")
+def favicon():
+    return send_from_directory(STATIC_DIR, "favicon.svg")
+
+@app.route("/robots.txt")
+def robots():
+    return send_from_directory(STATIC_DIR, "robots.txt")
+
+# SPA catch-all — serve index.html for all non-API, non-asset routes
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_react(path):
+    return send_from_directory(STATIC_DIR, "index.html")
 
 
 def _run_flask():
-    import os
     port = int(os.getenv("PORT", 10000))
     app.run(
         host="0.0.0.0",
         port=port,
         debug=False,
-        use_reloader=False
+        use_reloader=False,
     )
 
 
@@ -34,6 +59,8 @@ def keep_alive():
     t.daemon = True
     t.start()
 
+
+# ── Discord bot ───────────────────────────────────────────────────────────────
 
 COGS = [
     "cogs.admin",
@@ -99,6 +126,23 @@ class YSLBot(commands.Bot):
         )
         print(f"READY: {self.user} | {id(self)}")
 
+        # Track which guilds the bot is in so the dashboard can show them
+        guild_ids = [g.id for g in self.guilds]
+        bot_guilds_col.delete_many({})
+        if guild_ids:
+            bot_guilds_col.insert_many([{"guild_id": gid} for gid in guild_ids])
+        logger.info(f"Tracked {len(guild_ids)} guilds in dashboard DB")
+
+    async def on_guild_join(self, guild: discord.Guild):
+        bot_guilds_col.update_one(
+            {"guild_id": guild.id},
+            {"$set": {"guild_id": guild.id}},
+            upsert=True,
+        )
+
+    async def on_guild_remove(self, guild: discord.Guild):
+        bot_guilds_col.delete_one({"guild_id": guild.id})
+
 
 def validate_environment() -> None:
     if not DISCORD_TOKEN:
@@ -106,13 +150,7 @@ def validate_environment() -> None:
 
 
 async def run_bot() -> None:
-    """Start the bot, retrying with backoff if Discord returns a 429 on login.
-
-    Without this, a login-time 429 crashes the process, the host (e.g. Render)
-    immediately restarts it, and the new attempt hits the login endpoint again
-    right away — turning a temporary block into a hammering loop that keeps
-    the block alive.
-    """
+    """Start the bot, retrying with backoff if Discord returns a 429 on login."""
     max_attempts = 6
     base_delay = 60  # seconds
 
@@ -140,10 +178,7 @@ async def run_bot() -> None:
             if attempt == max_attempts:
                 logger.critical(
                     "Discord is still rate-limiting logins after %s attempts. "
-                    "This is usually an IP-level block on the hosting provider's shared "
-                    "IPs (common on Render's free tier), not something the bot code "
-                    "controls. Giving up for now — try again later or move to a host "
-                    "with a dedicated IP.",
+                    "Giving up for now — try again later or move to a host with a dedicated IP.",
                     max_attempts,
                 )
                 raise
