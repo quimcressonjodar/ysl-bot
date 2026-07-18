@@ -13,6 +13,7 @@ from config import (
     MODMAIL_TRANSCRIPT_CHANNEL_ID,
 )
 from database import modmail_col
+from utils.logger import log_action
 
 logger = logging.getLogger("weekly-xp-bot")
 
@@ -291,6 +292,17 @@ class ModMail(commands.Cog):
         )
 
         try:
+            log_action(
+                guild_id=MODMAIL_GUILD_ID,
+                log_type="modmail",
+                action="ticket_opened",
+                actor_id=user.id,
+                actor_name=str(user),
+            )
+        except Exception:
+            pass
+
+        try:
             await thread.send(
                 f"<@&{MODMAIL_MOD_ROLE_ID}> 📨 **New modmail ticket** — {user.mention} (`{user.id}`)\n"
                 f"Confirmed by the user. Reply in this thread to respond directly to them. "
@@ -355,6 +367,18 @@ class ModMail(commands.Cog):
         try:
             await user.send(embed=embed, files=files, allowed_mentions=discord.AllowedMentions.none())
             await message.add_reaction(DELIVERED_EMOJI)
+            try:
+                log_action(
+                    guild_id=MODMAIL_GUILD_ID,
+                    log_type="modmail",
+                    action="staff_reply",
+                    actor_id=message.author.id,
+                    actor_name=str(message.author),
+                    target_id=int(doc["_id"]),
+                    target_name=doc.get("username", "Unknown user"),
+                )
+            except Exception:
+                pass
         except discord.Forbidden:
             await message.reply(
                 "Delivery failed — this user has DMs disabled or has blocked the bot.",
@@ -414,6 +438,19 @@ class ModMail(commands.Cog):
             {"_id": doc["_id"]},
             {"$set": {"status": "closed", "closed_at": datetime.now(timezone.utc)}},
         )
+
+        try:
+            log_action(
+                guild_id=MODMAIL_GUILD_ID,
+                log_type="modmail",
+                action="ticket_closed",
+                actor_id=ctx.author.id,
+                actor_name=str(ctx.author),
+                target_id=int(doc["_id"]),
+                target_name=doc.get("username", "Unknown user"),
+            )
+        except Exception:
+            pass
 
         try:
             owner = self.bot.get_user(int(doc["_id"])) or await self.bot.fetch_user(int(doc["_id"]))

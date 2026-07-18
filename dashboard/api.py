@@ -115,15 +115,22 @@ def guild_detail(guild_id: str):
 @api_bp.route("/guilds/<guild_id>/logs")
 @login_required
 def get_logs(guild_id: str):
+    import re
     gid   = int(guild_id)
-    ftype = request.args.get("type", "all")      # all | command | economy | moderation
-    page  = max(1, int(request.args.get("page", 1)))
-    limit = min(100, max(10, int(request.args.get("limit", 50))))
-    skip  = (page - 1) * limit
+    ftype  = request.args.get("type", "all")   # all | command | economy | moderation | modmail
+    page   = max(1, int(request.args.get("page", 1)))
+    limit  = min(100, max(10, int(request.args.get("limit", 50))))
+    skip   = (page - 1) * limit
+    actor  = request.args.get("actor", "").strip()   # filter by actor username (partial)
+    action = request.args.get("action", "").strip()  # filter by exact action
 
     query: dict = {"guild_id": gid}
     if ftype != "all":
         query["type"] = ftype
+    if actor:
+        query["actor_name"] = {"$regex": re.escape(actor), "$options": "i"}
+    if action:
+        query["action"] = action
 
     total = bot_logs_col.count_documents(query)
     docs  = list(
@@ -133,9 +140,16 @@ def get_logs(guild_id: str):
         .limit(limit)
     )
 
+    # Return distinct actions for the current type filter (for the dropdown)
+    action_query: dict = {"guild_id": gid}
+    if ftype != "all":
+        action_query["type"] = ftype
+    distinct_actions = sorted(bot_logs_col.distinct("action", action_query))
+
     return jsonify({
-        "logs":     [_serialize_log(d) for d in docs],
-        "total":    total,
-        "page":     page,
-        "has_more": (skip + limit) < total,
+        "logs":            [_serialize_log(d) for d in docs],
+        "total":           total,
+        "page":            page,
+        "has_more":        (skip + limit) < total,
+        "distinct_actions": distinct_actions,
     })
