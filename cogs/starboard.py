@@ -124,9 +124,8 @@ class StarboardCog(commands.Cog):
                     "guild_id": guild.id
                 })
         elif starboard_entry:
-            # If it was already there but stars dropped below threshold (unlikely with just adding, but good for removal)
-            # Actually, the user requirement says "reaches a threshold", doesn't say what to do if it drops below.
-            # Usually it stays or gets deleted. I'll leave it for now unless I implement removal.
+            # Star count is below threshold but the entry still exists.
+            # Removal on reaction-remove is handled by on_raw_reaction_remove.
             pass
 
     @commands.Cog.listener()

@@ -257,7 +257,7 @@ REFERENCE_EMBED = _e(
         (
             "📬 Modmail",
             "DM the bot directly to start a private conversation with staff.\n"
-            "`!close` — (staff, inside a ticket thread) closes the modmail ticket",
+            "`!close` — (staff, inside a ticket channel) closes the modmail ticket",
         ),
     ],
 )

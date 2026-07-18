@@ -180,7 +180,7 @@ class EventsCog(commands.Cog):
 
     @tasks.loop(hours=1)
     async def process_interests(self):
-        """Aplica un 2% de interés diario prorrateado a los préstamos activos."""
+        """Apply a prorated 2% daily interest charge to all active loans."""
         now = time.time()
         users_with_loans = eco_col.find({"loan_amount": {"$gt": 0}})
 

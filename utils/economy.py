@@ -168,8 +168,8 @@ def get_prestige_level(net_worth: int) -> int:
 
 def apply_amortization(user_id: str, income: int) -> int:
     """
-    Aplica un porcentaje del ingreso a la deuda pendiente de forma atómica.
-    Retorna la cantidad neta que le queda al usuario después del pago.
+    Apply 30% of the given income towards any outstanding debt atomically.
+    Returns the net amount the user receives after the debt payment.
     """
     user_data = get_user_data(user_id)
     loan = user_data.get("loan_amount", 0)
@@ -184,13 +184,13 @@ def apply_amortization(user_id: str, income: int) -> int:
         payment = debt
 
     if payment <= interest:
-        # Pago solo afecta a intereses
+        # Payment covers accrued interest only
         eco_col.update_one(
             {"_id": user_id},
             {"$inc": {"interest_accrued": to_decimal128(-payment)}}
         )
     else:
-        # Pago cubre todos los intereses y parte del principal
+        # Payment covers all accrued interest and a portion of the principal
         remaining_payment = payment - interest
         eco_col.update_one(
             {"_id": user_id},

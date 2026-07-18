@@ -600,7 +600,7 @@ class EconomyCog(commands.Cog):
         from utils.economy import get_prestige_level
         level = get_prestige_level(net_worth)
         
-        # Credit limit based on prestige and net worth (ULTRA AGGRESSIVE)
+        # Credit limit based on prestige tier and net worth
         ratios = {
             0: 1.0,   # None: 100%
             1: 1.0,   # Bronze: 100%
@@ -612,7 +612,7 @@ class EconomyCog(commands.Cog):
             7: 100.0  # Master: 10,000%
         }
         ratio = ratios.get(level, 1.0)
-        # Minimum limit of 50,000 for new/poor players, otherwise use the aggressive ratio
+        # Floor the limit at 50,000 for new players with minimal net worth
         limit = max(50000, int(net_worth * ratio))
 
         # Parse amount (supports "max"/"all", "half", shorthand like "100k"/"2.5m"/"1t",
@@ -624,7 +624,7 @@ class EconomyCog(commands.Cog):
                 ephemeral=True,
             )
 
-        # Validación de entrada
+        # Validate the parsed amount
         if parsed_amount <= 0:
             if limit <= 0:
                 return await ctx.send("❌ Your credit limit is 0 because you have no net worth.", ephemeral=True)
@@ -648,7 +648,7 @@ class EconomyCog(commands.Cog):
                 ephemeral=True,
             )
             
-        # Operación atómica para evitar duplicación
+        # Atomic update — prevents issuing a duplicate loan if two requests arrive simultaneously
         now = time.time()
         result = eco_col.update_one(
             {"_id": user_id, "$or": [{"loan_amount": {"$exists": False}}, {"loan_amount": {"$lte": 0}}]},

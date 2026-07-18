@@ -19,7 +19,7 @@ Rules:
 - Max 25 words.
 """
 
-# 🔌 MongoDB
+# MongoDB connection for per-user conversation memory
 mongo_client = MongoClient(os.getenv("MONGO_URI"))
 db = mongo_client["protox_bot"]
 memory_col = db["memory"]
@@ -63,7 +63,7 @@ class FakeAdminAI(commands.Cog):
         if message.channel.id != self.channel_id:
             return
 
-        # cooldown
+        # Enforce a per-user cooldown to avoid spam
         if self.cooldown.get(message.author.id, 0) > asyncio.get_event_loop().time():
             return
 
@@ -72,18 +72,18 @@ class FakeAdminAI(commands.Cog):
         user_id = str(message.author.id)
 
         try:
-            # 💾 guardar memoria en MongoDB
+            # Persist the message to the user's rolling memory window (last 10 messages)
             memory_col.update_one(
                 {"user_id": user_id},
                 {"$push": {"messages": {"$each": [message.content], "$slice": -10}}},
                 upsert=True
             )
 
-            # 📥 leer memoria
+            # Load the user's conversation memory
             data = memory_col.find_one({"user_id": user_id})
             memory = data["messages"] if data and "messages" in data else []
 
-            # 🧠 construir prompt
+            # Build the prompt: system instructions first
             messages = [
                 {"role": "system", "content": SYSTEM_PROMPT}
             ]
@@ -94,7 +94,7 @@ class FakeAdminAI(commands.Cog):
                     "content": "User memory:\n" + "\n".join(memory)
                 })
 
-            # 💬 contexto corto del canal
+            # Append the last few non-bot channel messages as short-term context
             async for msg in message.channel.history(limit=3):
                 if msg.author.bot:
                     continue
@@ -104,13 +104,13 @@ class FakeAdminAI(commands.Cog):
                     "content": f"{msg.author.name}: {msg.content}"
                 })
 
-            # 🆕 mensaje actual
+            # Append the current message
             messages.append({
                 "role": "user",
                 "content": message.content
             })
 
-            # 🤖 IA call
+            # Call the LLM
             res = self.client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=messages,
