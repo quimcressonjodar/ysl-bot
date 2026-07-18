@@ -17,10 +17,11 @@ JOIN_APPLY_CHANNEL_ID = 1515467362097434715
 OWNER_IDS = {1436417791615045785, 941697213447421952, 1373879454077685800, 789938929151377428, 1325376607577178123}
 
 # ── Modmail ──────────────────────────────────────────────────────────────────
-# Dedicated staff server + channel where DMs sent to the bot get relayed as
-# threads. Anyone in that server/channel can see and reply to them.
+# Dedicated staff server where DMs sent to the bot get relayed as channels
+# inside a specific category.
 MODMAIL_GUILD_ID = 1526562448872701962
-MODMAIL_CHANNEL_ID = 1526562649578537111
+# Category where new modmail ticket channels are created.
+MODMAIL_CATEGORY_ID = 1526562449409441822
 MODMAIL_MOD_ROLE_ID = 1526574388906823831
 # Channel where a full HTML transcript + summary embed is posted once a modmail ticket is closed.
 MODMAIL_TRANSCRIPT_CHANNEL_ID = 1526926325695250523

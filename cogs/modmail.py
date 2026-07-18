@@ -1,6 +1,7 @@
 import html
 import io
 import logging
+import re
 from datetime import datetime, timezone
 
 import discord
@@ -8,7 +9,7 @@ from discord.ext import commands
 
 from config import (
     MODMAIL_GUILD_ID,
-    MODMAIL_CHANNEL_ID,
+    MODMAIL_CATEGORY_ID,
     MODMAIL_MOD_ROLE_ID,
     MODMAIL_TRANSCRIPT_CHANNEL_ID,
 )
@@ -28,12 +29,19 @@ CONFIRM_EMOJI = "✅"
 DELIVERED_EMOJI = "☑️"
 
 
-def _safe_thread_name(user: discord.abc.User) -> str:
-    name = f"{user.name} ({user.id})"
-    return name[:100]
+def _safe_channel_name(user: discord.abc.User) -> str:
+    """Build a valid Discord channel name from the user's username and ID.
+
+    Discord channel names must be 1–100 characters, lowercase, and may only
+    contain alphanumerics, hyphens, and underscores.
+    """
+    base = f"{user.name}-{user.id}".lower()
+    base = re.sub(r"[^a-z0-9\-_]", "", base.replace(" ", "-"))
+    base = re.sub(r"-+", "-", base).strip("-")
+    return base[:100] or f"modmail-{user.id}"
 
 
-def _build_transcript_html(thread: discord.Thread, messages: list[discord.Message]) -> str:
+def _build_transcript_html(channel: discord.TextChannel, messages: list[discord.Message]) -> str:
     """Renders the ticket's message history as a simple, self-contained HTML file
     styled to loosely resemble Discord's own dark theme."""
     rows = []
@@ -82,7 +90,7 @@ def _build_transcript_html(thread: discord.Thread, messages: list[discord.Messag
 
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
-        f"<title>Transcript - {html.escape(thread.name)}</title>"
+        f"<title>Transcript - {html.escape(channel.name)}</title>"
         "<style>"
         "body{background:#313338;color:#dbdee1;font-family:'gg sans','Helvetica Neue',Arial,sans-serif;"
         "margin:0;padding:24px;}"
@@ -95,15 +103,15 @@ def _build_transcript_html(thread: discord.Thread, messages: list[discord.Messag
         ".content{font-size:15px;line-height:1.4;white-space:pre-wrap;word-break:break-word;}"
         ".attachments a{color:#00a8fc;text-decoration:none;font-size:14px;}"
         "</style></head><body>"
-        f"<h1>📄 Transcript — {html.escape(thread.name)}</h1>"
+        f"<h1>📄 Transcript — {html.escape(channel.name)}</h1>"
         f"{body}"
         "</body></html>"
     )
 
 
 class ModMail(commands.Cog):
-    """Relays DMs sent to the bot into threads in a dedicated staff server,
-    and relays staff replies inside those threads back to the user's DMs.
+    """Relays DMs sent to the bot into dedicated channels inside a staff category,
+    and relays staff replies inside those channels back to the user's DMs.
 
     Before a ticket is opened, the user must confirm intent by reacting to a
     prompt from the bot. This filters out accidental/misdirected DMs so
@@ -112,40 +120,57 @@ class ModMail(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # ── Thread helpers ───────────────────────────────────────────────────────
+    # ── Channel helpers ──────────────────────────────────────────────────────
 
-    async def _get_target_channel(self) -> discord.TextChannel | None:
-        channel = self.bot.get_channel(MODMAIL_CHANNEL_ID)
-        if channel is None:
+    async def _get_modmail_category(self) -> discord.CategoryChannel | None:
+        """Fetch the category where ticket channels are created."""
+        guild = self.bot.get_guild(MODMAIL_GUILD_ID)
+        if guild is None:
             try:
-                channel = await self.bot.fetch_channel(MODMAIL_CHANNEL_ID)
+                guild = await self.bot.fetch_guild(MODMAIL_GUILD_ID)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                logger.error("Modmail channel %s not found/accessible.", MODMAIL_CHANNEL_ID)
+                logger.error("Modmail guild %s not found/accessible.", MODMAIL_GUILD_ID)
                 return None
-        if not isinstance(channel, discord.TextChannel):
-            logger.error("Modmail channel %s is not a text channel.", MODMAIL_CHANNEL_ID)
-            return None
-        return channel
 
-    async def _get_open_thread(self, user_id: str) -> discord.Thread | None:
+        category = guild.get_channel(MODMAIL_CATEGORY_ID)
+        if category is None:
+            try:
+                category = await self.bot.fetch_channel(MODMAIL_CATEGORY_ID)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                logger.error("Modmail category %s not found/accessible.", MODMAIL_CATEGORY_ID)
+                return None
+
+        if not isinstance(category, discord.CategoryChannel):
+            logger.error("Channel %s is not a category.", MODMAIL_CATEGORY_ID)
+            return None
+
+        return category
+
+    async def _get_open_channel(self, user_id: str) -> discord.TextChannel | None:
+        """Return the open ticket channel for a user, or None if none exists."""
         doc = modmail_col.find_one({"_id": user_id, "status": "open"})
         if not doc:
             return None
 
-        thread = self.bot.get_channel(doc["thread_id"])
-        if thread is None:
+        channel = self.bot.get_channel(doc["thread_id"])
+        if channel is None:
             try:
-                thread = await self.bot.fetch_channel(doc["thread_id"])
+                channel = await self.bot.fetch_channel(doc["thread_id"])
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                thread = None
+                channel = None
 
-        if thread is None or not isinstance(thread, discord.Thread) or thread.archived:
+        if channel is None or not isinstance(channel, discord.TextChannel):
             modmail_col.update_one({"_id": user_id}, {"$set": {"status": "closed"}})
             return None
 
-        return thread
+        # Make sure the channel is still in the modmail category
+        if channel.category_id != MODMAIL_CATEGORY_ID:
+            modmail_col.update_one({"_id": user_id}, {"$set": {"status": "closed"}})
+            return None
 
-    async def _relay_message_to_thread(self, thread: discord.Thread, message: discord.Message) -> bool:
+        return channel
+
+    async def _relay_message_to_channel(self, channel: discord.TextChannel, message: discord.Message) -> bool:
         embed = discord.Embed(
             description=message.content or "*(no text content)*",
             color=0x5865F2,
@@ -165,9 +190,9 @@ class ModMail(commands.Cog):
                 pass
 
         try:
-            await thread.send(embed=embed, files=files, allowed_mentions=discord.AllowedMentions.none())
+            await channel.send(embed=embed, files=files, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException as e:
-            logger.error("Failed to relay DM to modmail thread: %s", e)
+            logger.error("Failed to relay DM to modmail channel: %s", e)
             return False
         return True
 
@@ -208,12 +233,12 @@ class ModMail(commands.Cog):
         doc = modmail_col.find_one({"_id": user_id})
 
         if doc and doc.get("status") == "open":
-            thread = await self._get_open_thread(user_id)
-            if thread is None:
-                # Thread went away (deleted/archived) — ask for confirmation again.
+            channel = await self._get_open_channel(user_id)
+            if channel is None:
+                # Channel went away (deleted) — ask for confirmation again.
                 await self._send_confirmation_prompt(message)
                 return
-            delivered = await self._relay_message_to_thread(thread, message)
+            delivered = await self._relay_message_to_channel(channel, message)
             if delivered:
                 try:
                     await message.add_reaction(DELIVERED_EMOJI)
@@ -253,8 +278,8 @@ class ModMail(commands.Cog):
             except (discord.NotFound, discord.HTTPException):
                 return
 
-        channel = await self._get_target_channel()
-        if channel is None:
+        category = await self._get_modmail_category()
+        if category is None:
             try:
                 await dm_channel.send(
                     "We couldn't open a support conversation right now. Please try again shortly."
@@ -269,13 +294,13 @@ class ModMail(commands.Cog):
             return
 
         try:
-            thread = await channel.create_thread(
-                name=_safe_thread_name(user),
-                type=discord.ChannelType.public_thread,
+            ticket_channel = await category.guild.create_text_channel(
+                name=_safe_channel_name(user),
+                category=category,
                 reason="Modmail ticket",
             )
         except discord.HTTPException as e:
-            logger.error("Failed to create modmail thread for %s: %s", user.id, e)
+            logger.error("Failed to create modmail channel for %s: %s", user.id, e)
             return
 
         modmail_col.update_one(
@@ -283,7 +308,7 @@ class ModMail(commands.Cog):
             {
                 "$set": {
                     "status": "open",
-                    "thread_id": thread.id,
+                    "thread_id": ticket_channel.id,  # reuse field name; now stores channel ID
                     "guild_id": MODMAIL_GUILD_ID,
                     "opened_at": datetime.now(timezone.utc),
                 },
@@ -303,9 +328,9 @@ class ModMail(commands.Cog):
             pass
 
         try:
-            await thread.send(
+            await ticket_channel.send(
                 f"<@&{MODMAIL_MOD_ROLE_ID}> 📨 **New modmail ticket** — {user.mention} (`{user.id}`)\n"
-                f"Confirmed by the user. Reply in this thread to respond directly to them. "
+                f"Confirmed by the user. Reply in this channel to respond directly to them. "
                 f"Use `!close` to close the ticket.",
                 allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
             )
@@ -319,7 +344,7 @@ class ModMail(commands.Cog):
                 original = await dm_channel.fetch_message(msg_id)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 continue
-            await self._relay_message_to_thread(thread, original)
+            await self._relay_message_to_channel(ticket_channel, original)
 
         modmail_col.update_one({"_id": str(user.id)}, {"$set": {"pending_message_ids": []}})
 
@@ -333,7 +358,7 @@ class ModMail(commands.Cog):
 
     # ── Staff side ───────────────────────────────────────────────────────────
 
-    async def _forward_thread_to_dm(self, message: discord.Message) -> None:
+    async def _forward_channel_to_dm(self, message: discord.Message) -> None:
         doc = modmail_col.find_one({"thread_id": message.channel.id, "status": "open"})
         if not doc:
             return
@@ -385,7 +410,7 @@ class ModMail(commands.Cog):
                 mention_author=False,
             )
         except discord.HTTPException as e:
-            logger.error("Failed to relay thread reply to DM: %s", e)
+            logger.error("Failed to relay channel reply to DM: %s", e)
 
     # ── Listeners ────────────────────────────────────────────────────────────
 
@@ -402,11 +427,11 @@ class ModMail(commands.Cog):
 
         if (
             message.guild.id == MODMAIL_GUILD_ID
-            and isinstance(message.channel, discord.Thread)
-            and message.channel.parent_id == MODMAIL_CHANNEL_ID
+            and isinstance(message.channel, discord.TextChannel)
+            and message.channel.category_id == MODMAIL_CATEGORY_ID
             and not message.content.startswith(self.bot.command_prefix)
         ):
-            await self._forward_thread_to_dm(message)
+            await self._forward_channel_to_dm(message)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -425,14 +450,14 @@ class ModMail(commands.Cog):
         if not (
             ctx.guild
             and ctx.guild.id == MODMAIL_GUILD_ID
-            and isinstance(ctx.channel, discord.Thread)
-            and ctx.channel.parent_id == MODMAIL_CHANNEL_ID
+            and isinstance(ctx.channel, discord.TextChannel)
+            and ctx.channel.category_id == MODMAIL_CATEGORY_ID
         ):
-            return await ctx.send("This command can only be used inside a modmail ticket thread.", ephemeral=True)
+            return await ctx.send("This command can only be used inside a modmail ticket channel.", ephemeral=True)
 
         doc = modmail_col.find_one({"thread_id": ctx.channel.id})
         if not doc:
-            return await ctx.send("This thread isn't registered as a modmail ticket.", ephemeral=True)
+            return await ctx.send("This channel isn't registered as a modmail ticket.", ephemeral=True)
 
         modmail_col.update_one(
             {"_id": doc["_id"]},
@@ -466,31 +491,32 @@ class ModMail(commands.Cog):
             except (discord.Forbidden, discord.HTTPException):
                 pass
 
-        await ctx.send("✅ Ticket closed.")
+        await ctx.send("✅ Ticket closed. Posting transcript and deleting channel…")
         await self._post_transcript(ctx.channel, doc, owner, closed_by=ctx.author)
 
+        # Delete the channel now that the transcript has been saved
         try:
-            await ctx.channel.edit(archived=True, locked=True)
-        except discord.HTTPException:
-            pass
+            await ctx.channel.delete(reason="Modmail ticket closed")
+        except discord.HTTPException as e:
+            logger.error("Failed to delete modmail channel after close: %s", e)
 
     async def _post_transcript(
         self,
-        thread: discord.Thread,
+        channel: discord.TextChannel,
         doc: dict,
         owner: discord.abc.User | None,
         closed_by: discord.abc.User,
     ) -> None:
         try:
-            messages = [m async for m in thread.history(limit=None, oldest_first=True)]
+            messages = [m async for m in channel.history(limit=None, oldest_first=True)]
         except discord.HTTPException as e:
-            logger.error("Failed to fetch modmail thread history for transcript: %s", e)
+            logger.error("Failed to fetch modmail channel history for transcript: %s", e)
             messages = []
 
-        transcript_html = _build_transcript_html(thread, messages)
+        transcript_html = _build_transcript_html(channel, messages)
         transcript_file = discord.File(
             io.BytesIO(transcript_html.encode("utf-8")),
-            filename=f"transcript-{thread.id}.html",
+            filename=f"transcript-{channel.id}.html",
         )
 
         counts: dict[int, dict] = {}
@@ -511,22 +537,22 @@ class ModMail(commands.Cog):
             value=owner.mention if owner else f"`{doc['_id']}`",
             inline=False,
         )
-        embed.add_field(name="Ticket Name", value=thread.name, inline=False)
+        embed.add_field(name="Ticket Name", value=channel.name, inline=False)
         embed.add_field(name="Panel Name", value="Direct Message Modmail", inline=False)
         embed.add_field(name="Closed By", value=closed_by.mention, inline=False)
         embed.add_field(name="Users in Transcript", value=users_text[:1024], inline=False)
         embed.set_footer(text=f"{len(messages)} messages")
 
-        channel = self.bot.get_channel(MODMAIL_TRANSCRIPT_CHANNEL_ID)
-        if channel is None:
+        transcript_channel = self.bot.get_channel(MODMAIL_TRANSCRIPT_CHANNEL_ID)
+        if transcript_channel is None:
             try:
-                channel = await self.bot.fetch_channel(MODMAIL_TRANSCRIPT_CHANNEL_ID)
+                transcript_channel = await self.bot.fetch_channel(MODMAIL_TRANSCRIPT_CHANNEL_ID)
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 logger.error("Modmail transcript channel %s not found/accessible.", MODMAIL_TRANSCRIPT_CHANNEL_ID)
                 return
 
         try:
-            await channel.send(embed=embed, file=transcript_file)
+            await transcript_channel.send(embed=embed, file=transcript_file)
         except discord.HTTPException as e:
             logger.error("Failed to post modmail transcript: %s", e)
 
