@@ -26,6 +26,25 @@ MODMAIL_MOD_ROLE_ID = 1526574388906823831
 # Channel where a full HTML transcript + summary embed is posted once a modmail ticket is closed.
 MODMAIL_TRANSCRIPT_CHANNEL_ID = 1526926325695250523
 
+# ── Leveling ─────────────────────────────────────────────────────────────────
+# XP awarded per qualifying message (random value in [XP_MIN, XP_MAX]).
+XP_MIN = 15
+XP_MAX = 25
+# Seconds a user must wait between XP awards (prevents spam farming).
+XP_COOLDOWN = 60
+
+# Map level milestone → Discord role ID.
+# Run /createlevelroles in your server to create the roles, then fill in the IDs.
+LEVEL_ROLES: dict[int, int] = {
+    1:  0,
+    5:  0,
+    10: 0,
+    15: 0,
+    20: 0,
+    30: 0,
+    50: 0,
+}
+
 # ── Server boosts ────────────────────────────────────────────────────────────
 # Channel where a thank-you message is posted whenever a member boosts the server.
 BOOST_THANKS_CHANNEL_ID = 1524353296704340048

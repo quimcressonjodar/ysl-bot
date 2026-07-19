@@ -77,6 +77,7 @@ COGS = [
     "cogs.troll",
     "cogs.horserace",
     "cogs.modmail",
+    "cogs.leveling",
 ]
 
 
