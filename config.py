@@ -36,13 +36,13 @@ XP_COOLDOWN = 60
 # Map level milestone → Discord role ID.
 # Run /createlevelroles in your server to create the roles, then fill in the IDs.
 LEVEL_ROLES: dict[int, int] = {
-    1:  0,
-    5:  0,
-    10: 0,
-    15: 0,
-    20: 0,
-    30: 0,
-    50: 0,
+    1:  1528464058284507166,
+    5:  1528464059048132619,
+    10: 1528464059635077122,
+    15: 1528464062181150821,
+    20: 1528464063707877446,
+    30: 1528464064961839114,
+    50: 1528464066367066372,
 }
 
 # ── Server boosts ────────────────────────────────────────────────────────────
