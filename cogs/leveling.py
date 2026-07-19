@@ -1,4 +1,4 @@
-"""Message-based leveling system with rank cards, leaderboards, and role rewards."""
+"""Message-based leveling system with rank cards, embed leaderboards, and role rewards."""
 
 import logging
 import random
@@ -11,25 +11,21 @@ from discord.ext import commands
 
 from config import LEVEL_ROLES, XP_COOLDOWN, XP_MIN, XP_MAX
 from database import levels_col
-from utils.level_card import (
-    generate_rank_card,
-    generate_leaderboard_card,
-    fetch_leaderboard_avatars,
-)
+from utils.level_card import generate_rank_card
 
 logger = logging.getLogger("weekly-xp-bot")
+
+EMBED_COLOR = 0x00B4FF   # bright blue — matches the cyan accent
 
 # ── XP math ───────────────────────────────────────────────────────────────────
 
 def xp_to_next(level: int) -> int:
-    """XP required to advance from `level` to `level + 1`."""
     return 5 * level * level + 50 * level + 100
 
 
 def compute_level(total_xp: int) -> tuple[int, int, int]:
     """Return (level, xp_in_current_level, xp_needed_for_next_level)."""
-    level = 0
-    cumulative = 0
+    level, cumulative = 0, 0
     while True:
         needed = xp_to_next(level)
         if cumulative + needed > total_xp:
@@ -40,11 +36,37 @@ def compute_level(total_xp: int) -> tuple[int, int, int]:
             return level, 0, xp_to_next(level)
 
 
-# ── Leaderboard pagination View ───────────────────────────────────────────────
+# ── Go To Page modal ──────────────────────────────────────────────────────────
+
+class GoToPageModal(discord.ui.Modal, title="Go to page"):
+    page_input = discord.ui.TextInput(
+        label="Page number",
+        placeholder="Enter a number…",
+        min_length=1,
+        max_length=6,
+    )
+
+    def __init__(self, view: "LeaderboardView"):
+        super().__init__()
+        self._view = view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            page = int(self.page_input.value)
+        except ValueError:
+            return await interaction.response.send_message(
+                "Please enter a valid number.", ephemeral=True
+            )
+        page = max(1, min(page, self._view.total_pages))
+        self._view.current_page = page
+        self._view._update_buttons()
+        embed = await self._view._build_embed()
+        await interaction.response.edit_message(embed=embed, view=self._view)
+
+
+# ── Leaderboard View ──────────────────────────────────────────────────────────
 
 class LeaderboardView(discord.ui.View):
-    """Interactive pagination for leaderboard images."""
-
     PER_PAGE = 10
 
     def __init__(
@@ -58,12 +80,12 @@ class LeaderboardView(discord.ui.View):
         current_page: int = 1,
     ):
         super().__init__(timeout=120)
-        self.cog        = cog
-        self.caller     = caller
-        self.sort_field = sort_field
-        self.title      = title
-        self.stat_fn    = stat_fn
-        self.total_pages = total_pages
+        self.cog          = cog
+        self.caller       = caller
+        self.sort_field   = sort_field
+        self.title        = title
+        self.stat_fn      = stat_fn
+        self.total_pages  = total_pages
         self.current_page = current_page
         self.message: discord.Message | None = None
         self._update_buttons()
@@ -72,8 +94,7 @@ class LeaderboardView(discord.ui.View):
         self.prev_btn.disabled = self.current_page <= 1
         self.next_btn.disabled = self.current_page >= self.total_pages
 
-    async def _render_page(self) -> discord.File:
-        """Build the image for the current page and return it as a File."""
+    async def _build_embed(self) -> discord.Embed:
         page = self.current_page
         docs = list(
             levels_col.find({self.sort_field: {"$gt": 0}})
@@ -81,44 +102,47 @@ class LeaderboardView(discord.ui.View):
             .skip((page - 1) * self.PER_PAGE)
             .limit(self.PER_PAGE)
         )
-        avatars = await fetch_leaderboard_avatars(self.cog.bot, docs)
 
         caller_doc  = self.cog._get_doc(str(self.caller.id))
         caller_rank = levels_col.count_documents(
             {self.sort_field: {"$gt": caller_doc.get(self.sort_field, 0)}}
         ) + 1
 
-        rows = []
+        lines = []
         global_start = (page - 1) * self.PER_PAGE
-        for i, (doc, avt) in enumerate(zip(docs, avatars)):
+        for i, doc in enumerate(docs):
             pos  = global_start + i + 1
-            user = self.cog.bot.get_user(int(doc["_id"]))
-            name = user.display_name if user else f"User {doc['_id']}"
-            rows.append((pos, name, self.stat_fn(doc), avt))
+            uid  = int(doc["_id"])
+            stat = self.stat_fn(doc)
+            lines.append(f"{pos}. <@{uid}> - {stat}")
 
-        buf = await generate_leaderboard_card(
-            title=self.title,
-            rows=rows,
-            caller_rank=caller_rank,
-            caller_name=self.caller.display_name,
-            page=page,
-            total_pages=self.total_pages,
+        embed = discord.Embed(
+            title=f"🏆 {self.title} (Page {page}/{self.total_pages})",
+            description="\n".join(lines) or "No entries yet.",
+            color=EMBED_COLOR,
         )
-        return discord.File(buf, filename="leaderboard.png")
+        embed.set_footer(
+            text=f"\U0001f50e {self.caller.display_name}'s Position: #{caller_rank}"
+        )
+        return embed
 
-    @discord.ui.button(label="◀  Prev", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
     async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page -= 1
         self._update_buttons()
-        file = await self._render_page()
-        await interaction.response.edit_message(attachments=[file], view=self)
+        embed = await self._build_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
 
-    @discord.ui.button(label="Next  ▶", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Go To Page", style=discord.ButtonStyle.primary)
+    async def goto_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(GoToPageModal(self))
+
+    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
     async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current_page += 1
         self._update_buttons()
-        file = await self._render_page()
-        await interaction.response.edit_message(attachments=[file], view=self)
+        embed = await self._build_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
 
     async def on_timeout(self) -> None:
         if self.message:
@@ -131,13 +155,11 @@ class LeaderboardView(discord.ui.View):
 # ── Cog ───────────────────────────────────────────────────────────────────────
 
 class LevelingCog(commands.Cog):
-    """Awards XP for messages, tracks levels, and assigns roles at milestones."""
-
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._cooldown: dict[int, float] = {}
 
-    # ── XP internals ──────────────────────────────────────────────────────────
+    # ── DB helpers ────────────────────────────────────────────────────────────
 
     def _get_doc(self, user_id: str) -> dict:
         return levels_col.find_one({"_id": user_id}) or {
@@ -145,13 +167,11 @@ class LevelingCog(commands.Cog):
         }
 
     def _add_xp(self, user_id: str, amount: int) -> tuple[int, int, bool]:
-        """Increment XP and message count. Returns (old_level, new_level, leveled_up)."""
-        doc      = self._get_doc(user_id)
-        old_lvl  = doc.get("level", 0)
-        new_xp   = doc.get("xp", 0) + amount
-        new_msgs = doc.get("messages", 0) + 1
+        doc     = self._get_doc(user_id)
+        old_lvl = doc.get("level", 0)
+        new_xp  = doc.get("xp", 0) + amount
+        new_msgs= doc.get("messages", 0) + 1
         new_lvl, _, _ = compute_level(new_xp)
-
         levels_col.update_one(
             {"_id": user_id},
             {"$set": {
@@ -167,19 +187,18 @@ class LevelingCog(commands.Cog):
         value = doc.get(sort_field, 0)
         return levels_col.count_documents({sort_field: {"$gt": value}}) + 1
 
-    # ── Role helpers ──────────────────────────────────────────────────────────
+    # ── Role helper ───────────────────────────────────────────────────────────
 
     async def _assign_level_role(
         self, member: discord.Member, new_level: int
     ) -> discord.Role | None:
-        guild  = member.guild
         earned = [lvl for lvl in sorted(LEVEL_ROLES) if lvl <= new_level]
         if not earned:
             return None
         role_id = LEVEL_ROLES.get(earned[-1], 0)
         if not role_id:
             return None
-        role = guild.get_role(role_id)
+        role = member.guild.get_role(role_id)
         if role is None or role in member.roles:
             return None
         try:
@@ -209,16 +228,13 @@ class LevelingCog(commands.Cog):
         self._cooldown[uid] = now
         amount = random.randint(XP_MIN, XP_MAX)
         old_lvl, new_lvl, leveled_up = self._add_xp(str(uid), amount)
-
         if not leveled_up:
             return
 
         _, xp_in, xp_need = compute_level(self._get_doc(str(uid)).get("xp", 0))
         embed = discord.Embed(
-            description=(
-                f"GG {message.author.mention}, you just reached **Level {new_lvl}**!"
-            ),
-            color=0x00D2FF,
+            description=f"GG {message.author.mention}, you just reached **Level {new_lvl}**!",
+            color=EMBED_COLOR,
             timestamp=datetime.now(timezone.utc),
         )
         embed.set_thumbnail(url=message.author.display_avatar.url)
@@ -253,12 +269,11 @@ class LevelingCog(commands.Cog):
             await ctx.send(file=discord.File(buf, filename=f"rank_{target.id}.png"))
         except Exception as e:
             logger.error("Rank card failed: %s", e)
-            embed = discord.Embed(color=0x00D2FF)
+            embed = discord.Embed(color=EMBED_COLOR)
             embed.set_author(name=target.display_name, icon_url=target.display_avatar.url)
-            embed.add_field(name="Level",    value=str(level),                    inline=True)
-            embed.add_field(name="Rank",     value=f"#{rank}",                    inline=True)
-            embed.add_field(name="XP",       value=f"{xp_in:,} / {xp_need:,}",   inline=True)
-            embed.add_field(name="Messages", value=f"{messages:,}",               inline=True)
+            embed.add_field(name="Level",    value=str(level),                  inline=True)
+            embed.add_field(name="Rank",     value=f"#{rank}",                  inline=True)
+            embed.add_field(name="XP",       value=f"{xp_in:,} / {xp_need:,}", inline=True)
             await ctx.send(embed=embed)
 
     # ── !lvltop ───────────────────────────────────────────────────────────────
@@ -269,7 +284,7 @@ class LevelingCog(commands.Cog):
         await ctx.defer()
         await self._send_leaderboard(
             ctx, sort_field="xp",
-            title="Level Leaderboard",
+            title="Leaderboard Levels",
             stat_fn=self._level_stat,
             page=page,
         )
@@ -282,12 +297,12 @@ class LevelingCog(commands.Cog):
         await ctx.defer()
         await self._send_leaderboard(
             ctx, sort_field="messages",
-            title="Messages Leaderboard",
+            title="Leaderboard Messages",
             stat_fn=self._msg_stat,
             page=page,
         )
 
-    # ── Leaderboard builder ───────────────────────────────────────────────────
+    # ── Leaderboard sender ────────────────────────────────────────────────────
 
     _PER_PAGE = 10
 
@@ -307,22 +322,13 @@ class LevelingCog(commands.Cog):
         page = max(1, min(page, total_pages))
 
         view = LeaderboardView(
-            cog=self,
-            caller=ctx.author,
-            sort_field=sort_field,
-            title=title,
-            stat_fn=stat_fn,
-            total_pages=total_pages,
-            current_page=page,
+            cog=self, caller=ctx.author,
+            sort_field=sort_field, title=title, stat_fn=stat_fn,
+            total_pages=total_pages, current_page=page,
         )
-
-        try:
-            file = await view._render_page()
-            msg  = await ctx.send(file=file, view=view)
-            view.message = msg
-        except Exception as e:
-            logger.error("Leaderboard card failed: %s", e)
-            await ctx.send("Could not generate the leaderboard image. Please try again.")
+        embed = await view._build_embed()
+        msg   = await ctx.send(embed=embed, view=view)
+        view.message = msg
 
     # ── Stat formatters ───────────────────────────────────────────────────────
 
@@ -331,7 +337,7 @@ class LevelingCog(commands.Cog):
         return f"Level {level}"
 
     def _msg_stat(self, doc: dict) -> str:
-        return f"{doc.get('messages', 0):,} msgs"
+        return f"{doc.get('messages', 0):,} messages"
 
     # ── /createlevelroles ─────────────────────────────────────────────────────
 
@@ -342,7 +348,6 @@ class LevelingCog(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     async def createlevelroles(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-
         ROLE_DEFS = [
             ("Level 1",  discord.Color(0x80DEEA)),
             ("Level 5",  discord.Color(0x4DD0E1)),
@@ -352,7 +357,6 @@ class LevelingCog(commands.Cog):
             ("Level 30", discord.Color(0x006064)),
             ("Level 50", discord.Color(0x01579B)),
         ]
-
         lines, failed = [], []
         for name, color in ROLE_DEFS:
             try:
