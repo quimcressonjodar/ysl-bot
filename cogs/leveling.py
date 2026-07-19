@@ -11,7 +11,7 @@ from discord.ext import commands
 
 from config import LEVEL_ROLES, XP_COOLDOWN, XP_MIN, XP_MAX
 from database import levels_col
-from utils.level_card import generate_rank_card
+from utils.level_card import generate_rank_card, generate_leaderboard_card
 
 logger = logging.getLogger("weekly-xp-bot")
 
@@ -36,32 +36,6 @@ def compute_level(total_xp: int) -> tuple[int, int, int]:
             return level, 0, xp_to_next(level)
 
 
-# ── Pagination view ───────────────────────────────────────────────────────────
-
-class LeaderboardView(discord.ui.View):
-    def __init__(self, pages: list[discord.Embed]):
-        super().__init__(timeout=120)
-        self.pages = pages
-        self.current = 0
-        self._update_buttons()
-
-    def _update_buttons(self) -> None:
-        self.prev_btn.disabled = self.current == 0
-        self.next_btn.disabled = self.current == len(self.pages) - 1
-
-    @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
-    async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current -= 1
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
-
-    @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
-    async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current += 1
-        self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
-
-
 # ── Cog ───────────────────────────────────────────────────────────────────────
 
 class LevelingCog(commands.Cog):
@@ -80,10 +54,7 @@ class LevelingCog(commands.Cog):
         }
 
     def _add_xp(self, user_id: str, amount: int) -> tuple[int, int, bool]:
-        """
-        Increment the user's XP and message count.
-        Returns (old_level, new_level, leveled_up).
-        """
+        """Increment XP and message count. Returns (old_level, new_level, leveled_up)."""
         doc = self._get_doc(user_id)
         old_level = doc.get("level", 0)
         new_xp = doc.get("xp", 0) + amount
@@ -147,7 +118,7 @@ class LevelingCog(commands.Cog):
         user_id = message.author.id
         now = time.monotonic()
 
-        # Always count the message, but only award XP after the cooldown.
+        # Always count the message; only award XP after the cooldown.
         if now - self._cooldown.get(user_id, 0) < XP_COOLDOWN:
             levels_col.update_one(
                 {"_id": str(user_id)},
@@ -166,7 +137,7 @@ class LevelingCog(commands.Cog):
         # ── Level-up announcement ─────────────────────────────────────────────
         _, xp_in, xp_need = compute_level(self._get_doc(str(user_id)).get("xp", 0))
         embed = discord.Embed(
-            description=f"🎉 {message.author.mention} just reached **Level {new_level}**!",
+            description=f"GG {message.author.mention}, you just reached **Level {new_level}**!",
             color=0x00DCFF,
             timestamp=datetime.now(timezone.utc),
         )
@@ -176,7 +147,7 @@ class LevelingCog(commands.Cog):
         if isinstance(message.author, discord.Member):
             role = await self._assign_level_role(message.author, new_level)
             if role:
-                embed.add_field(name="🏅 Role Unlocked", value=role.mention, inline=False)
+                embed.add_field(name="Role Unlocked", value=role.mention, inline=False)
 
         try:
             await message.channel.send(embed=embed)
@@ -204,10 +175,10 @@ class LevelingCog(commands.Cog):
             logger.error("Rank card generation failed: %s", e)
             embed = discord.Embed(color=0x00DCFF)
             embed.set_author(name=target.display_name, icon_url=target.display_avatar.url)
-            embed.add_field(name="Level",    value=str(level),                inline=True)
-            embed.add_field(name="Rank",     value=f"#{rank}",                inline=True)
+            embed.add_field(name="Level",    value=str(level),                  inline=True)
+            embed.add_field(name="Rank",     value=f"#{rank}",                  inline=True)
             embed.add_field(name="XP",       value=f"{xp_in:,} / {xp_need:,}", inline=True)
-            embed.add_field(name="Messages", value=f"{messages:,}",           inline=True)
+            embed.add_field(name="Messages", value=f"{messages:,}",             inline=True)
             await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="lvltop", description="Leaderboard sorted by level / XP")
@@ -215,9 +186,11 @@ class LevelingCog(commands.Cog):
     async def lvltop(self, ctx: commands.Context, page: int = 1):
         await ctx.defer()
         await self._send_leaderboard(
-            ctx, sort_field="xp",
-            title="🏆 Level Leaderboard",
-            row_fn=self._level_row, page=page,
+            ctx,
+            sort_field="xp",
+            title="Level Leaderboard",
+            stat_fn=self._level_stat,
+            page=page,
         )
 
     @commands.hybrid_command(name="msgtop", description="Leaderboard sorted by message count")
@@ -225,9 +198,11 @@ class LevelingCog(commands.Cog):
     async def msgtop(self, ctx: commands.Context, page: int = 1):
         await ctx.defer()
         await self._send_leaderboard(
-            ctx, sort_field="messages",
-            title="💬 Messages Leaderboard",
-            row_fn=self._msg_row, page=page,
+            ctx,
+            sort_field="messages",
+            title="Messages Leaderboard",
+            stat_fn=self._msg_stat,
+            page=page,
         )
 
     # ── Leaderboard helpers ───────────────────────────────────────────────────
@@ -239,7 +214,7 @@ class LevelingCog(commands.Cog):
         ctx: commands.Context,
         sort_field: str,
         title: str,
-        row_fn,
+        stat_fn,
         page: int,
     ) -> None:
         total = levels_col.count_documents({sort_field: {"$gt": 0}})
@@ -262,30 +237,41 @@ class LevelingCog(commands.Cog):
             {sort_field: {"$gt": caller_doc.get(sort_field, 0)}}
         ) + 1
 
-        embed = discord.Embed(
-            title=f"{title} — Page {page}/{total_pages}",
-            color=0x00DCFF,
-            timestamp=datetime.now(timezone.utc),
-        )
-        lines = []
+        rows: list[tuple[int, str, str]] = []
         global_start = (page - 1) * self.PER_PAGE
         for i, doc in enumerate(all_docs):
             pos = global_start + i + 1
             user = self.bot.get_user(int(doc["_id"]))
-            name = user.mention if user else f"`{doc['_id']}`"
-            lines.append(f"**{pos}.** {name} — {row_fn(doc)}")
+            name = user.display_name if user else f"User {doc['_id']}"
+            rows.append((pos, name, stat_fn(doc)))
 
-        embed.description = "\n".join(lines) or "No entries on this page."
-        embed.set_footer(text=f"Your position: #{caller_rank}")
-        await ctx.send(embed=embed)
+        try:
+            buf = await generate_leaderboard_card(
+                title=title,
+                rows=rows,
+                caller_rank=caller_rank,
+                caller_name=ctx.author.display_name,
+                page=page,
+                total_pages=total_pages,
+            )
+            await ctx.send(file=discord.File(buf, filename="leaderboard.png"))
+        except Exception as e:
+            logger.error("Leaderboard card generation failed: %s", e)
+            lines = [f"**{pos}.** {name} — {stat}" for pos, name, stat in rows]
+            embed = discord.Embed(
+                title=f"{title} — Page {page}/{total_pages}",
+                description="\n".join(lines),
+                color=0x00DCFF,
+            )
+            embed.set_footer(text=f"Your position: #{caller_rank}")
+            await ctx.send(embed=embed)
 
-    def _level_row(self, doc: dict) -> str:
+    def _level_stat(self, doc: dict) -> str:
         level, _, _ = compute_level(doc.get("xp", 0))
-        return f"Level **{level}** • {doc.get('xp', 0):,} XP"
+        return f"Level {level}"
 
-    def _msg_row(self, doc: dict) -> str:
-        level, _, _ = compute_level(doc.get("xp", 0))
-        return f"**{doc.get('messages', 0):,}** messages • Level {level}"
+    def _msg_stat(self, doc: dict) -> str:
+        return f"{doc.get('messages', 0):,} msgs"
 
     # ── /createlevelroles ─────────────────────────────────────────────────────
 
@@ -298,13 +284,13 @@ class LevelingCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         ROLE_DEFS = [
-            ("Level 1",  discord.Color(0x80DEEA)),  # light cyan
-            ("Level 5",  discord.Color(0x4DD0E1)),  # cyan
-            ("Level 10", discord.Color(0x26C6DA)),  # medium cyan
-            ("Level 15", discord.Color(0x00ACC1)),  # cyan-teal
-            ("Level 20", discord.Color(0x0097A7)),  # teal
-            ("Level 30", discord.Color(0x006064)),  # deep teal  ← tone shift
-            ("Level 50", discord.Color(0x01579B)),  # deep blue (same cool family)
+            ("Level 1",  discord.Color(0x80DEEA)),
+            ("Level 5",  discord.Color(0x4DD0E1)),
+            ("Level 10", discord.Color(0x26C6DA)),
+            ("Level 15", discord.Color(0x00ACC1)),
+            ("Level 20", discord.Color(0x0097A7)),
+            ("Level 30", discord.Color(0x006064)),
+            ("Level 50", discord.Color(0x01579B)),
         ]
 
         lines = []
@@ -320,10 +306,10 @@ class LevelingCog(commands.Cog):
             except discord.HTTPException as e:
                 failed.append(f"**{name}**: {e}")
 
-        result = "✅ **Level roles created — send these IDs to the bot admin:**\n\n"
+        result = "**Level roles created — send these IDs to the bot admin:**\n\n"
         result += "\n".join(lines)
         if failed:
-            result += "\n\n❌ **Failed:**\n" + "\n".join(failed)
+            result += "\n\n**Failed:**\n" + "\n".join(failed)
 
         await interaction.followup.send(result, ephemeral=True)
 
