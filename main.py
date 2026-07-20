@@ -53,6 +53,7 @@ COGS = [
     "cogs.horserace",
     "cogs.modmail",
     "cogs.leveling",
+    "cogs.autoreply",
 ]
 
 
