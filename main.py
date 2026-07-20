@@ -8,40 +8,16 @@ from flask import Flask, send_from_directory
 from threading import Thread
 
 from config import DISCORD_TOKEN
-from database import bot_guilds_col
-from dashboard import auth_bp, api_bp
 
 logger = logging.getLogger("weekly-xp-bot")
 
 # ── Flask app ─────────────────────────────────────────────────────────────────
 
 app = Flask(__name__, static_folder=None)
-app.secret_key = os.getenv("DASHBOARD_SECRET_KEY", "change-me-in-production")
 
-# Register blueprints
-app.register_blueprint(auth_bp)
-app.register_blueprint(api_bp)
-
-# Serve built React static assets
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "dashboard", "static")
-
-@app.route("/assets/<path:filename>")
-def static_assets(filename):
-    return send_from_directory(os.path.join(STATIC_DIR, "assets"), filename)
-
-@app.route("/favicon.svg")
-def favicon():
-    return send_from_directory(STATIC_DIR, "favicon.svg")
-
-@app.route("/robots.txt")
-def robots():
-    return send_from_directory(STATIC_DIR, "robots.txt")
-
-# SPA catch-all — serve index.html for all non-API, non-asset routes
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def serve_react(path):
-    return send_from_directory(STATIC_DIR, "index.html")
+@app.route("/")
+def health():
+    return "OK", 200
 
 
 def _run_flask():
@@ -69,7 +45,6 @@ COGS = [
     "cogs.games",
     "cogs.utility",
     "cogs.events",
-    "cogs.fake_admin_ai",
     "cogs.starboard",
     "cogs.stocks",
     "cogs.bounties",
@@ -152,22 +127,6 @@ class YSLBot(commands.Bot):
         )
         print(f"READY: {self.user} | {id(self)}")
 
-        # Track which guilds the bot is in so the dashboard can show them
-        guild_ids = [g.id for g in self.guilds]
-        bot_guilds_col.delete_many({})
-        if guild_ids:
-            bot_guilds_col.insert_many([{"guild_id": gid} for gid in guild_ids])
-        logger.info(f"Tracked {len(guild_ids)} guilds in dashboard DB")
-
-    async def on_guild_join(self, guild: discord.Guild):
-        bot_guilds_col.update_one(
-            {"guild_id": guild.id},
-            {"$set": {"guild_id": guild.id}},
-            upsert=True,
-        )
-
-    async def on_guild_remove(self, guild: discord.Guild):
-        bot_guilds_col.delete_one({"guild_id": guild.id})
 
 
 def validate_environment() -> None:
