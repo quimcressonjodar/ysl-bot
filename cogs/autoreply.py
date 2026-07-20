@@ -34,11 +34,10 @@ def _modmail_reply(message: discord.Message):
 
 
 def _leveling_reply(message: discord.Message):
-    channel_mention = f"<#{XP_CHANNEL_ID}>"
     embed = discord.Embed(
         title="📈 How Leveling Works",
         description=(
-            f"Chat in {channel_mention} to earn XP!\n\n"
+            "Chat in any channel to earn XP!\n\n"
             "• Messages must have **more than one word** — no spam counting\n"
             "• There's a short cooldown between XP gains\n"
             "• The more active you are, the faster you rank up!\n\n"
