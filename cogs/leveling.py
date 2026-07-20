@@ -152,6 +152,9 @@ class LeaderboardView(discord.ui.View):
                 pass
 
 
+# Channel where XP is earned and level-up messages are sent
+XP_CHANNEL_ID = 1512485221541478402
+
 # ── Cog ───────────────────────────────────────────────────────────────────────
 
 class LevelingCog(commands.Cog):
@@ -213,7 +216,17 @@ class LevelingCog(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot or message.guild is None:
             return
+
+        # Only award XP in the designated channel
+        if message.channel.id != XP_CHANNEL_ID:
+            return
+
+        # Ignore empty messages
         if not message.content.strip() and not message.attachments:
+            return
+
+        # Ignore single-word messages
+        if len(message.content.split()) < 2:
             return
 
         uid = message.author.id

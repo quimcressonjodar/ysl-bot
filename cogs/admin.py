@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.helpers import is_admin, parse_duration, load_warns, save_warns, get_next_warn_id, can_moderate
-from database import eco_col, pets_col
+from database import eco_col, pets_col, businesses_col
 from config import ROLE_SHOP, STOCKS, ADD_ALLOWED_IDS, MAX_ECONOMY_AMOUNT
 from utils.stocks import stocks_col, user_stocks_col, stock_alerts_col, ipo_col
 from utils.bounties import bounties_col
@@ -587,7 +587,10 @@ class AdminCog(commands.Cog):
             if sym not in base_symbols:
                 STOCKS.pop(sym, None)
 
-        # 4. Clear bounties
+        # 4. Clear all businesses
+        businesses_col.delete_many({})
+
+        # 5. Clear bounties
         bounties_col.delete_many({})
 
         # 5. Remove shop roles from all members in the guild
@@ -620,6 +623,7 @@ class AdminCog(commands.Cog):
                 "✅ All stock price history cleared\n"
                 "✅ All price alerts deleted\n"
                 "✅ All IPO companies delisted\n"
+                "✅ All businesses deleted\n"
                 "✅ All bounties cleared\n"
                 f"✅ Removed shop roles from **{removed_count}** members"
             ),
