@@ -152,8 +152,8 @@ class LeaderboardView(discord.ui.View):
                 pass
 
 
-# Channel where XP is earned and level-up messages are sent
-XP_CHANNEL_ID = 1512485221541478402
+# Channels where XP is NOT earned (excluded from leveling)
+EXCLUDED_CHANNEL_IDS = {1516579181033685022, 1513755454029959239}
 
 # ── Cog ───────────────────────────────────────────────────────────────────────
 
@@ -217,8 +217,8 @@ class LevelingCog(commands.Cog):
         if message.author.bot or message.guild is None:
             return
 
-        # Only award XP in the designated channel
-        if message.channel.id != XP_CHANNEL_ID:
+        # Do not award XP in excluded channels
+        if message.channel.id in EXCLUDED_CHANNEL_IDS:
             return
 
         # Ignore empty messages
