@@ -54,6 +54,7 @@ COGS = [
     "cogs.modmail",
     "cogs.leveling",
     "cogs.autoreply",
+    "cogs.giveaways",
 ]
 
 

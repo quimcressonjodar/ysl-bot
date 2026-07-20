@@ -42,7 +42,7 @@ def _leveling_reply(message: discord.Message):
             "• Messages must have **more than one word** — no spam counting\n"
             "• There's a short cooldown between XP gains\n"
             "• The more active you are, the faster you rank up!\n\n"
-            "Check your level with **`!rank`** and the leaderboard with **`!leaderboard`**"
+            "Check your level with **`!rank`**, message leaderboard with **`!msgtop`** and XP leaderboard with **`!lvltop`**"
         ),
         color=0x2ECC71,
     )
