@@ -82,8 +82,11 @@ def build_giveaway_embed(
     bonus_role: Optional[discord.Role],
     bonus_amount: int,
     entry_count: int,
+    description: Optional[str] = None,
 ) -> discord.Embed:
     lines = ["**Click the button below to enter!**\n"]
+    if description:
+        lines.append(f"📝  {description}\n")
     lines.append(f"🏆  **Winners:** {winner_count}")
     lines.append(f"⏱️  **Ends:** {fmt_ts(ends_dt)}")
     lines.append(f"👤  **Hosted by:** {host.mention}")
@@ -189,6 +192,7 @@ class GiveawayView(discord.ui.View):
             bonus_role    = _get_role(doc.get("bonus_role_id")),
             bonus_amount  = doc.get("bonus_amount", 1),
             entry_count   = unique_count,
+            description   = doc.get("description"),
         )
         try:
             await interaction.message.edit(embed=embed)
@@ -372,6 +376,7 @@ class GiveawayCog(commands.Cog):
         duration      = "Duration: 10m · 1h · 2d · 1h30m",
         winners       = "Number of winners (1–20)",
         prize         = "What you're giving away",
+        description   = "Optional description shown in the giveaway embed",
         require_role  = "Users must have this role to enter",
         blacklist_role= "Users with this role cannot enter",
         bonus_role    = "This role gets extra entries",
@@ -382,6 +387,7 @@ class GiveawayCog(commands.Cog):
         duration: str,
         winners: app_commands.Range[int, 1, 20],
         prize: str,
+        description:    Optional[str] = None,
         require_role:   Optional[discord.Role] = None,
         blacklist_role: Optional[discord.Role] = None,
         bonus_role:     Optional[discord.Role] = None,
@@ -410,6 +416,7 @@ class GiveawayCog(commands.Cog):
             bonus_role    = bonus_role,
             bonus_amount  = bonus_amount,
             entry_count   = 0,
+            description   = description,
         )
 
         if not ctx.interaction:
@@ -431,6 +438,7 @@ class GiveawayCog(commands.Cog):
             "channel_id":     ctx.channel.id,
             "guild_id":       ctx.guild.id,
             "prize":          prize,
+            "description":    description,
             "winner_count":   winners,
             "ends_at":        ends_at,
             "host_id":        ctx.author.id,
