@@ -18,6 +18,38 @@ from utils.helpers import is_admin
 
 STOCK_NEWS_CHANNEL_ID = 1513755454029959239
 
+# ---------------------------------------------------------------------------
+# Fee helpers — pure integer arithmetic so huge balances stay exact.
+#
+# STOCK_FEE = 0.02 (2%).  At prestige level L the effective fee shrinks:
+#   effective_fee = STOCK_FEE * max(0, 1 − L × 0.15)
+#
+# Expressed in basis-points (1 bp = 1/10 000):
+#   fee_bps = round(STOCK_FEE × 10 000) × max(0, 10 000 − L × 1 500) // 10 000
+#           = 200 × max(0, 10 000 − L × 1 500) // 10 000
+#
+# buy_cost  = price × qty × (10 000 + fee_bps) // 10 000
+# sell_gain = price × qty × (10 000 − fee_bps) // 10 000
+# max_qty   = wallet × 10 000 // (price × (10 000 + fee_bps))
+#
+# Because Python ints are arbitrary-precision and we only use // (floor div),
+# the cost computed here is guaranteed ≤ wallet for qty = max_qty(wallet).
+# ---------------------------------------------------------------------------
+_STOCK_FEE_BPS = round(STOCK_FEE * 10_000)   # 200 for STOCK_FEE = 0.02
+
+
+def _fee_parts(level: int) -> tuple[int, int, int]:
+    """Return (cost_num, gain_num, den) for a given prestige level.
+
+    buy_cost  = price * qty * cost_num // den
+    sell_gain = price * qty * gain_num // den
+    max_qty   = wallet * den // (price * cost_num)
+    """
+    reduction = max(0, 10_000 - level * 1_500)
+    fee_bps = _STOCK_FEE_BPS * reduction // 10_000
+    den = 10_000
+    return den + fee_bps, den - fee_bps, den
+
 
 class StockView(discord.ui.View):
     def __init__(self, ctx, symbol):
@@ -68,11 +100,10 @@ class StockView(discord.ui.View):
         bank = get_bank(user_id)
         level = get_prestige_level(wallet + bank)
 
-        fee_multiplier = max(0, 1 - (level * 0.15))
-        current_fee = STOCK_FEE * fee_multiplier
+        cost_num, gain_num, fee_den = _fee_parts(level)
 
         if side == "buy":
-            total_cost = int(price * quantity * (1 + current_fee))
+            total_cost = price * quantity * cost_num // fee_den
             if wallet < total_cost:
                 msg = f"❌ You need 🪙 {total_cost:,} to buy {quantity} shares (including fees)."
                 return await target.response.send_message(msg, ephemeral=True) if is_interaction else await target.send(msg)
@@ -82,7 +113,7 @@ class StockView(discord.ui.View):
             msg = f"✅ Bought {quantity} shares of **{self.symbol}** for 🪙 {total_cost:,}!"
             return await target.response.send_message(msg, ephemeral=True) if is_interaction else await target.send(msg)
         else:
-            total_gain = int(price * quantity * (1 - current_fee))
+            total_gain = price * quantity * gain_num // fee_den
             portfolio = get_user_portfolio(user_id)
             avg_price = portfolio.get(self.symbol, {}).get("avg_price", 0)
             profit = int((price - avg_price) * quantity)
@@ -108,7 +139,7 @@ class StockView(discord.ui.View):
                     color = 0x95A5A6
                     title = "✅ Sale completed"
 
-                fee_paid = int(price * quantity * current_fee)
+                fee_paid = price * quantity * (cost_num - fee_den) // fee_den
                 embed = discord.Embed(title=title, color=color)
                 embed.add_field(name="📦 Shares sold", value=f"**{quantity}x {self.symbol}**", inline=True)
                 embed.add_field(name="💰 Received", value=f"🪙 {total_gain:,}", inline=True)
@@ -260,16 +291,18 @@ class Stocks(commands.Cog):
         price = get_current_price(symbol)
 
         level = get_prestige_level(wallet + get_bank(user_id))
-        fee_multiplier = 1.0 + (STOCK_FEE * (1 - (level / 7.0)))
-        cost_per_share = price * fee_multiplier
+        cost_num, _gain_num, fee_den = _fee_parts(level)
+        # cost_per_share (integer, rounded up) used only for the affordability message
+        cost_per_share = price * cost_num // fee_den
 
         if quantity.lower() in ["all", "max"]:
             if cost_per_share > wallet:
                 return await ctx.send(
-                    f"❌ You can't afford any shares of {symbol}. You need at least 🪙 {int(cost_per_share):,}.",
+                    f"❌ You can't afford any shares of {symbol}. You need at least 🪙 {cost_per_share:,}.",
                     ephemeral=True,
                 )
-            parsed_quantity = int(wallet // cost_per_share)
+            # Integer division — guaranteed that process_trade_direct will not exceed wallet
+            parsed_quantity = wallet * fee_den // (price * cost_num)
         else:
             try:
                 parsed_quantity = int(quantity.replace(",", ""))

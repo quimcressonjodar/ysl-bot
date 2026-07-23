@@ -495,16 +495,18 @@ async def check_autosells(bot):
             autosell_col.delete_one({"_id": order["_id"]})
             continue
 
-        # Apply same fee logic as manual sells
+        # Apply same fee logic as manual sells — pure integer arithmetic
         wallet = get_wallet(user_id)
         bank = get_bank(user_id)
         level = get_prestige_level(wallet + bank)
-        fee_multiplier = max(0, 1 - (level * 0.15))
-        current_fee = STOCK_FEE * fee_multiplier
+        _STOCK_FEE_BPS = round(STOCK_FEE * 10_000)
+        reduction = max(0, 10_000 - level * 1_500)
+        fee_bps = _STOCK_FEE_BPS * reduction // 10_000
+        fee_den = 10_000
 
-        total_gain = int(current_price * sell_qty * (1 - current_fee))
+        total_gain = current_price * sell_qty * (fee_den - fee_bps) // fee_den
         profit = int((current_price - avg_price) * sell_qty)
-        fee_paid = int(current_price * sell_qty * current_fee)
+        fee_paid = current_price * sell_qty * fee_bps // fee_den
 
         try:
             sold = sell_stock(user_id, symbol, sell_qty)
