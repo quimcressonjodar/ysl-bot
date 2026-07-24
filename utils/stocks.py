@@ -2,6 +2,7 @@ import random
 import time
 import os
 from zoneinfo import ZoneInfo
+from bson.decimal128 import Decimal128
 import matplotlib
 # Use Agg backend for headless environments like Render
 matplotlib.use('Agg')
@@ -193,9 +194,30 @@ def generate_stock_chart(symbol):
 # Portfolio helpers
 # ---------------------------------------------------------------------------
 
+def _qty_from_stored(value) -> int:
+    """Convert a stored stock quantity (may be plain int or Decimal128) to a
+    Python int. Python ints are arbitrary-precision, so nothing is lost."""
+    if isinstance(value, Decimal128):
+        return int(value.to_decimal())
+    return int(value) if value else 0
+
+
+def _qty_to_stored(quantity: int) -> Decimal128:
+    """Convert a Python int share quantity to Decimal128 for MongoDB storage.
+    This avoids the MongoDB 8-byte (int64) ceiling which caps at ~9.2 quintillion."""
+    return Decimal128(str(quantity))
+
+
 def get_user_portfolio(user_id):
     portfolio = user_stocks_col.find_one({"_id": user_id})
-    return portfolio.get("stocks", {}) if portfolio else {}
+    if not portfolio:
+        return {}
+    stocks = portfolio.get("stocks", {})
+    # Normalise any Decimal128 quantities so callers always get plain ints
+    for sym, data in stocks.items():
+        if isinstance(data, dict) and "quantity" in data:
+            data["quantity"] = _qty_from_stored(data["quantity"])
+    return stocks
 
 
 def buy_stock(user_id, symbol, quantity, price):
@@ -210,17 +232,21 @@ def buy_stock(user_id, symbol, quantity, price):
     portfolio = user_stocks_col.find_one({"_id": user_id})
     current = portfolio.get("stocks", {}).get(symbol, {"quantity": 0, "avg_price": 0})
 
-    new_quantity = current["quantity"] + quantity
+    current_qty = _qty_from_stored(current["quantity"])
+    current_avg = float(current["avg_price"]) if current["avg_price"] else 0.0
+
+    new_quantity = current_qty + quantity
     new_avg_price = (
-        (current["quantity"] * current["avg_price"]) + (quantity * price)
+        (current_qty * current_avg) + (quantity * price)
     ) / new_quantity
 
-    # Use dot-notation $set so ONLY this symbol's fields are written,
-    # leaving every other symbol in the user's portfolio untouched.
+    # Store quantity as Decimal128 so arbitrarily large share counts never
+    # hit MongoDB's 8-byte int64 ceiling (~9.2 quintillion).
+    # avg_price is a regular float — it tracks price-per-share, not total shares.
     user_stocks_col.update_one(
         {"_id": user_id},
         {"$set": {
-            f"stocks.{symbol}.quantity": new_quantity,
+            f"stocks.{symbol}.quantity": _qty_to_stored(new_quantity),
             f"stocks.{symbol}.avg_price": new_avg_price,
         }},
     )
@@ -231,7 +257,7 @@ def sell_stock(user_id, symbol, quantity):
     if not portfolio or symbol not in portfolio.get("stocks", {}):
         return False
 
-    current_qty = portfolio["stocks"][symbol]["quantity"]
+    current_qty = _qty_from_stored(portfolio["stocks"][symbol]["quantity"])
     if current_qty < quantity:
         return False
 
@@ -245,7 +271,7 @@ def sell_stock(user_id, symbol, quantity):
     else:
         user_stocks_col.update_one(
             {"_id": user_id},
-            {"$set": {f"stocks.{symbol}.quantity": new_qty}},
+            {"$set": {f"stocks.{symbol}.quantity": _qty_to_stored(new_qty)}},
         )
     return True
 

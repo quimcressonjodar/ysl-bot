@@ -108,8 +108,10 @@ class StockView(discord.ui.View):
                 msg = f"❌ You need 🪙 {total_cost:,} to buy {quantity} shares (including fees)."
                 return await target.response.send_message(msg, ephemeral=True) if is_interaction else await target.send(msg)
 
-            update_wallet(user_id, -total_cost)
+            # Write shares FIRST — if this raises, the wallet is untouched.
+            # Only deduct coins after a confirmed successful portfolio update.
             buy_stock(user_id, self.symbol, quantity, price)
+            update_wallet(user_id, -total_cost)
             msg = f"✅ Bought {quantity} shares of **{self.symbol}** for 🪙 {total_cost:,}!"
             return await target.response.send_message(msg, ephemeral=True) if is_interaction else await target.send(msg)
         else:
