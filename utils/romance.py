@@ -136,22 +136,70 @@ def _draw_sparkles(draw, tick: int):
 
 
 def _draw_lips(draw, cx: float, cy: float, scale: float = 1.0):
-    """Stylised lips at (cx, cy)."""
-    w  = int(20 * scale)
-    hu = int(7  * scale)
-    hl = int(10 * scale)
-    lip   = (210, 40, 70, 255)
-    shine = (255, 145, 170, 210)
-    # Upper lip: two lobes
-    draw.ellipse((cx - w,   cy - hu, cx - 2,   cy + 2), fill=lip)
-    draw.ellipse((cx + 2,   cy - hu, cx + w,   cy + 2), fill=lip)
-    # Cupid's-bow carve (background-coloured triangle)
-    draw.polygon([(cx - 5, cy - hu + 1), (cx + 5, cy - hu + 1), (cx, cy - 1)],
-                 fill=BG)
-    # Lower lip
-    draw.ellipse((cx - w + 2, cy, cx + w - 2, cy + hl * 2), fill=lip)
-    # Shine
-    draw.ellipse((cx - w // 3, cy + 2, cx + w // 3, cy + hl), fill=shine)
+    """Realistic glossy lips at (cx, cy) — cupid's bow upper, full lower, gloss highlights."""
+    cx, cy = int(cx), int(cy)
+    w   = int(26 * scale)   # half-width
+    hu  = int(10 * scale)   # upper lip height
+    hl  = int(14 * scale)   # lower lip height
+
+    # ── Colours ──────────────────────────────────────────────────────────────
+    lip_dark   = (155, 10,  35, 255)   # deep shadow / outline
+    lip_mid    = (210, 30,  60, 255)   # main body
+    lip_bright = (235, 55,  80, 255)   # lighter facing planes
+    shine1     = (255, 180, 195, 220)  # primary gloss streak
+    shine2     = (255, 230, 235, 160)  # soft secondary highlight
+    divider    = (130,  5,  25, 220)   # centre crease between lips
+
+    # ── Shadow base (slightly larger, dark) ──────────────────────────────────
+    draw.ellipse((cx - w - 2, cy - hu - 2, cx + w + 2, cy + hl * 2 + 2),
+                 fill=lip_dark)
+
+    # ── Upper lip body ────────────────────────────────────────────────────────
+    # Left lobe
+    draw.ellipse((cx - w,       cy - hu, cx - 1,    cy + 3),  fill=lip_mid)
+    # Right lobe
+    draw.ellipse((cx + 1,       cy - hu, cx + w,    cy + 3),  fill=lip_mid)
+    # Fill in centre strip so lobes connect
+    draw.rectangle((cx - w // 2, cy - hu + 3, cx + w // 2, cy + 3), fill=lip_mid)
+
+    # Cupid's-bow valley (background-coloured notch at top centre)
+    bow_depth = int(5 * scale)
+    draw.polygon([
+        (cx - int(7 * scale), cy - hu + 2),
+        (cx + int(7 * scale), cy - hu + 2),
+        (cx,                   cy - bow_depth),
+    ], fill=BG)
+
+    # ── Lower lip body ────────────────────────────────────────────────────────
+    draw.ellipse((cx - w + 2, cy, cx + w - 2, cy + hl * 2), fill=lip_bright)
+
+    # Subtle darker shadow at corners of lower lip
+    corner_r = int(8 * scale)
+    draw.ellipse((cx - w + 2, cy, cx - w + 2 + corner_r * 2, cy + corner_r * 2),
+                 fill=lip_dark)
+    draw.ellipse((cx + w - 2 - corner_r * 2, cy, cx + w - 2, cy + corner_r * 2),
+                 fill=lip_dark)
+
+    # ── Centre crease between upper and lower lip ─────────────────────────────
+    draw.line([(cx - w + 4, cy + 1), (cx + w - 4, cy + 1)],
+              fill=divider, width=max(2, int(2 * scale)))
+
+    # ── Primary gloss streak on lower lip ─────────────────────────────────────
+    gx1 = cx - int(w * 0.55)
+    gx2 = cx + int(w * 0.55)
+    gy1 = cy + int(hl * 0.28)
+    gy2 = cy + int(hl * 0.85)
+    draw.ellipse((gx1, gy1, gx2, gy2), fill=shine1)
+
+    # ── Soft secondary highlight (narrower, brighter centre) ─────────────────
+    draw.ellipse((cx - int(w * 0.28), gy1 + int(2 * scale),
+                  cx + int(w * 0.28), gy1 + int(hl * 0.45)),
+                 fill=shine2)
+
+    # ── Small upper-lip highlight (left lobe) ─────────────────────────────────
+    draw.ellipse((cx - int(w * 0.7), cy - int(hu * 0.7),
+                  cx - int(w * 0.2), cy - int(hu * 0.1)),
+                 fill=shine2)
 
 
 # ── Legs ──────────────────────────────────────────────────────────────────────
