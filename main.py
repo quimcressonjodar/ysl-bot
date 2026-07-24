@@ -55,6 +55,7 @@ COGS = [
     "cogs.leveling",
     "cogs.autoreply",
     "cogs.giveaways",
+    "cogs.romance",
 ]
 
 
