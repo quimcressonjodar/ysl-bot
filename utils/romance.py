@@ -191,13 +191,22 @@ def _draw_legs_stand(draw, cx: int, hip_y: int):
 # ── Arms ──────────────────────────────────────────────────────────────────────
 
 def _draw_arms_walking(draw, cx: int, sy: int, step_t: float):
-    """Arms swing opposite to legs."""
-    for sign in (-1, 1):
-        # Arms are opposite phase to the leg on the same side
-        phase = step_t + math.pi if sign == -1 else step_t
-        arm_ang = math.sin(phase) * 22
-        ex, ey = _polar(cx, sy, arm_ang * sign, ARM_UP)
-        hx, hy = _polar(ex, ey, arm_ang * sign * 0.5, ARM_LO)
+    """Arms swing opposite to legs. Each arm stays on its own side."""
+    for side in (-1, 1):
+        # Arms opposite phase to same-side leg → use opposite of leg phase
+        # Left leg phase = step_t  → left arm phase = step_t + π
+        # Right leg phase = step_t + π → right arm phase = step_t
+        phase = step_t + math.pi if side == -1 else step_t
+        swing = math.sin(phase)  # -1 … +1
+
+        # Elbow: always on its side, shifts slightly with swing
+        ex = cx + side * 46 + int(side * swing * 12)
+        ey = sy + 36 - int(swing * 10)
+
+        # Hand: further out, follows elbow swing
+        hx = ex + side * 12 + int(side * swing * 8)
+        hy = ey + 34 + int(swing * 8)
+
         draw.line([(cx, sy), (ex, ey)], fill=INK, width=LINE_W)
         draw.line([(ex, ey), (hx, hy)], fill=INK, width=LINE_W - 1)
 
