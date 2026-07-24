@@ -118,7 +118,10 @@ class StockView(discord.ui.View):
             total_gain = price * quantity * gain_num // fee_den
             portfolio = get_user_portfolio(user_id)
             avg_price = portfolio.get(self.symbol, {}).get("avg_price", 0)
-            profit = int((price - avg_price) * quantity)
+            # Use integer arithmetic: avg_price is stored as a float coin amount,
+            # round to nearest int so profit stays a pure Python int with no
+            # float precision loss (critical when quantity is astronomically large).
+            profit = (price - round(avg_price)) * quantity
 
             if sell_stock(user_id, self.symbol, quantity):
                 update_wallet(user_id, total_gain)

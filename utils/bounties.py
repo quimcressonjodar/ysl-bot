@@ -111,29 +111,35 @@ async def track_bounty_progress(bot, user_id, bounty_key, increment):
     """Update progress for a specific bounty type for a user."""
     user_id = str(user_id)
     active_bounties = bounties_col.find({"key": bounty_key, "status": "active"})
-    
+
+    # MongoDB int64 ceiling (~9.2 quintillion). Balances and profits can exceed
+    # this when share counts are enormous, so we clamp the stored value.
+    # The bounty-completion check (new_progress >= goal) still works correctly
+    # because it runs on the Python value before the clamp.
+    _MONGO_INT64_MAX = 9_223_372_036_854_775_807
+
     for bounty in active_bounties:
         current_progress = bounty.get("participants", {}).get(user_id, 0)
         new_progress = current_progress + increment
-        
+
         if new_progress >= bounty["goal"]:
             # Bounty Completed!
             bounties_col.update_one(
                 {"_id": bounty["_id"]},
                 {
                     "$set": {
-                        "status": "completed", 
-                        "winner": user_id, 
+                        "status": "completed",
+                        "winner": user_id,
                         "completion_time": time.time(),
-                        f"participants.{user_id}": new_progress
+                        f"participants.{user_id}": min(new_progress, _MONGO_INT64_MAX),
                     }
                 }
             )
-            
+
             # Pay reward
             from utils.economy import update_wallet
             update_wallet(user_id, bounty["reward"])
-            
+
             # Announce in Discord
             STOCK_NEWS_CHANNEL_ID = 1513755454029959239
             channel = bot.get_channel(STOCK_NEWS_CHANNEL_ID)
@@ -148,8 +154,8 @@ async def track_bounty_progress(bot, user_id, bounty_key, increment):
                 embed.set_footer(text="A new bounty will be posted soon!")
                 await channel.send(embed=embed)
         else:
-            # Update progress
+            # Update progress — clamp to int64 to avoid MongoDB OverflowError
             bounties_col.update_one(
                 {"_id": bounty["_id"]},
-                {"$set": {f"participants.{user_id}": new_progress}}
+                {"$set": {f"participants.{user_id}": min(new_progress, _MONGO_INT64_MAX)}}
             )

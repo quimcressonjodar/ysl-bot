@@ -531,7 +531,7 @@ async def check_autosells(bot):
         fee_den = 10_000
 
         total_gain = current_price * sell_qty * (fee_den - fee_bps) // fee_den
-        profit = int((current_price - avg_price) * sell_qty)
+        profit = (current_price - round(avg_price)) * sell_qty
         fee_paid = current_price * sell_qty * fee_bps // fee_den
 
         try:
