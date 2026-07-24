@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import io
 import math
+import os
+import functools
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
@@ -133,6 +135,17 @@ def _draw_sparkles(draw, tick: int):
         s = 7 + ((tick + i * 3) % 4)
         draw.line((x - s, y, x + s, y), fill=SPARK, width=3)
         draw.line((x, y - s, x, y + s), fill=SPARK, width=3)
+
+
+@functools.lru_cache(maxsize=1)
+def _load_lips_png() -> "Image.Image | None":
+    """Load and cache the real lips PNG once; return None if not found."""
+    base = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base, "..", "assets", "kiss_lips.png")
+    try:
+        return Image.open(path).convert("RGBA")
+    except OSError:
+        return None
 
 
 def _draw_lips(draw, cx: float, cy: float, scale: float = 1.0):
@@ -357,11 +370,31 @@ def _draw_person(canvas: Image.Image, avatar: Image.Image,
     )
 
     # ── Lips (kiss phase only) ─────────────────────────────────────────────
-    if phase == 'kiss':
+    if phase == 'kiss' and phase_t > 0.05:
         inner = 1 if facing_right else -1
+        lip_scale = 1.0 + phase_t * 0.35
         lip_cx = cx + head_lean + inner * int(HR * 0.20 * phase_t)
         lip_cy = hcy + int(HR * 0.52)
-        _draw_lips(draw, lip_cx, lip_cy, scale=1.0 + phase_t * 0.35)
+
+        lips_png = _load_lips_png()
+        if lips_png is not None:
+            # Size the lips relative to the avatar radius
+            lw = int(HR * 1.6 * lip_scale)
+            lh = int(lw * lips_png.height / lips_png.width)
+            lips_r = lips_png.resize((lw, lh), Image.Resampling.LANCZOS)
+            if not facing_right:
+                lips_r = ImageOps.mirror(lips_r)
+            # Fade in with phase_t
+            alpha_mul = min(1.0, phase_t * 2.5)
+            if alpha_mul < 1.0:
+                r, g, b, a = lips_r.split()
+                a = a.point(lambda p: int(p * alpha_mul))
+                lips_r = Image.merge('RGBA', (r, g, b, a))
+            px = lip_cx - lw // 2
+            py = lip_cy - lh // 2
+            canvas.alpha_composite(lips_r, (max(0, px), max(0, py)))
+        else:
+            _draw_lips(draw, lip_cx, lip_cy, scale=lip_scale)
 
     # ── Name label ─────────────────────────────────────────────────────────
     nfont = _font(20, bold=True)
