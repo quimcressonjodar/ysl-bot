@@ -6,7 +6,6 @@ import hashlib
 import io
 import math
 
-import aiohttp
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
@@ -37,17 +36,10 @@ def love_verdict(score: int) -> str:
     return "The cosmic timing is not on your side yet."
 
 
-async def download_avatar(session: aiohttp.ClientSession, url: str) -> Image.Image:
-    """Download and decode an avatar, rejecting oversized responses."""
-    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-        response.raise_for_status()
-        content_length = response.headers.get("Content-Length")
-        if content_length and int(content_length) > 5_000_000:
-            raise ValueError("avatar is too large")
-        data = await response.content.read(5_000_000)
-        if len(data) >= 5_000_000:
-            raise ValueError("avatar is too large")
-
+def decode_avatar(data: bytes) -> Image.Image:
+    """Decode avatar bytes returned by discord.py's Asset.read()."""
+    if len(data) > 5_000_000:
+        raise ValueError("avatar is too large")
     with Image.open(io.BytesIO(data)) as image:
         return image.convert("RGBA")
 

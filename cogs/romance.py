@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import aiohttp
+import asyncio
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.romance import download_avatar, love_score, love_verdict, render_kiss_gif
+from utils.romance import decode_avatar, love_score, love_verdict, render_kiss_gif
 
 
 class RomanceCog(commands.Cog):
@@ -45,11 +46,8 @@ class RomanceCog(commands.Cog):
 
         await ctx.defer()
         try:
-            async with aiohttp.ClientSession(
-                headers={"User-Agent": "YSL-Bot/1.0 avatar renderer"},
-            ) as session:
-                first_avatar, second_avatar = await self._download_pair(ctx.author, other, session)
-        except (aiohttp.ClientError, OSError, ValueError):
+            first_avatar, second_avatar = await self._download_pair(ctx.author, other)
+        except (discord.HTTPException, OSError, ValueError):
             return await ctx.send(
                 "I couldn't fetch one of the avatars right now. Please try again in a moment.",
                 ephemeral=True,
@@ -75,11 +73,12 @@ class RomanceCog(commands.Cog):
     async def _download_pair(
         first: discord.abc.User,
         second: discord.abc.User,
-        session: aiohttp.ClientSession,
     ):
-        first_url = first.display_avatar.replace(format="png", size=256).url
-        second_url = second.display_avatar.replace(format="png", size=256).url
-        return await download_avatar(session, first_url), await download_avatar(session, second_url)
+        first_bytes, second_bytes = await asyncio.gather(
+            first.display_avatar.with_size(256).read(),
+            second.display_avatar.with_size(256).read(),
+        )
+        return decode_avatar(first_bytes), decode_avatar(second_bytes)
 
 
 async def setup(bot: commands.Bot):
