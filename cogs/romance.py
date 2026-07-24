@@ -37,16 +37,19 @@ class RomanceCog(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="kiss", description="Make two members kiss in a cute animated GIF")
-    @app_commands.describe(other="The member you want to kiss")
-    async def kiss(self, ctx: commands.Context, other: discord.Member):
-        if other.bot:
+    @app_commands.describe(
+        member1="First member",
+        member2="Second member",
+    )
+    async def kiss(self, ctx: commands.Context, member1: discord.Member, member2: discord.Member):
+        if member1.bot or member2.bot:
             return await ctx.send("Bots cannot kiss, but they can watch from the front row.", ephemeral=True)
-        if other.id == ctx.author.id:
-            return await ctx.send("You need to choose another member to kiss.", ephemeral=True)
+        if member1.id == member2.id:
+            return await ctx.send("You need to choose two different members.", ephemeral=True)
 
         await ctx.defer()
         try:
-            first_avatar, second_avatar = await self._download_pair(ctx.author, other)
+            first_avatar, second_avatar = await self._download_pair(member1, member2)
         except (discord.HTTPException, OSError, ValueError):
             return await ctx.send(
                 "I couldn't fetch one of the avatars right now. Please try again in a moment.",
@@ -56,13 +59,13 @@ class RomanceCog(commands.Cog):
         gif = render_kiss_gif(
             first_avatar,
             second_avatar,
-            ctx.author.display_name,
-            other.display_name,
+            member1.display_name,
+            member2.display_name,
         )
         file = discord.File(gif, filename="ysl-kiss.gif")
         embed = discord.Embed(
-            title="Kiss cam",
-            description=f"{ctx.author.mention} kisses {other.mention}",
+            title="Kiss cam 💋",
+            description=f"{member1.mention} kisses {member2.mention}",
             color=0xEC497B,
         )
         embed.set_image(url="attachment://ysl-kiss.gif")
