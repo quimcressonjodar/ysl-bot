@@ -34,8 +34,9 @@ N_FRAMES  = WALK_F + STOP_F + HUG_F + KISS_F   # 44
 FRAME_MS  = 70
 
 # Horizontal positions
-SX_L, SX_R = 78, 642           # start (walk from edges)
-EX_L, EX_R = 244, 476          # end (hug / kiss zone)
+SX_L, SX_R  = 78,  642   # walk start (from edges)
+EX_L, EX_R  = 244, 476   # walk end / hug position
+KX_L, KX_R  = 296, 424   # kiss position (gap ≈ 128 px, heads nearly touching)
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 INK    = (30, 22, 55, 255)
@@ -156,23 +157,23 @@ def _draw_lips(draw, cx: float, cy: float, scale: float = 1.0):
 # ── Legs ──────────────────────────────────────────────────────────────────────
 
 def _draw_legs_walking(draw, cx: int, hip_y: int, step_t: float):
-    """2-segment walking legs. step_t = stride cycle in radians."""
-    for sign in (-1, 1):
-        phase = step_t if sign == -1 else step_t + math.pi
+    """2-segment walking legs.  Each leg lives permanently on its own side."""
+    for side in (-1, 1):
+        # Opposite phase so legs alternate
+        phase = step_t if side == -1 else step_t + math.pi
+        swing = math.sin(phase)          # -1 … +1  (forward = positive)
 
-        thigh_ang = math.sin(phase) * 30           # ±30° from vertical
-        # Shin bends opposite to thigh swing (natural follow-through)
-        shin_extra = -math.sin(phase) * 18
-        shin_ang   = thigh_ang + shin_extra
+        # ── knee: always on its side, rises slightly when striding forward ──
+        knee_x = cx + side * 18 + int(side * swing * 8)
+        knee_y = hip_y + THIGH_L - max(0, int(swing * 14))
 
-        kx, ky = _polar(cx, hip_y, thigh_ang * sign, THIGH_L)
-        fx, fy = _polar(kx, ky,    shin_ang  * sign, SHIN_L)
-        fy = min(fy, GY)
+        # ── foot: further out and lifted when striding ──
+        foot_x = cx + side * 28 + int(side * swing * 16)
+        foot_y = GY - max(0, int(swing * 22))
 
-        draw.line([(cx, hip_y), (kx, ky)], fill=INK, width=LINE_W)
-        draw.line([(kx, ky), (fx, fy)],    fill=INK, width=LINE_W - 1)
-        # Foot stub
-        draw.line([(fx - 6, fy), (fx + 10, fy)], fill=INK, width=4)
+        draw.line([(cx, hip_y), (knee_x, knee_y)], fill=INK, width=LINE_W)
+        draw.line([(knee_x, knee_y), (foot_x, foot_y)], fill=INK, width=LINE_W - 1)
+        draw.line([(foot_x - 6, foot_y), (foot_x + 10, foot_y)], fill=INK, width=4)
 
 
 def _draw_legs_stand(draw, cx: int, hip_y: int):
@@ -363,16 +364,21 @@ def render_kiss_gif(
             phase_t = (fi - WALK_F) / max(STOP_F - 1, 1)
 
         elif fi < WALK_F + STOP_F + HUG_F:
+            ht      = _ease_out((fi - WALK_F - STOP_F) / (HUG_F - 1))
             phase   = 'hug'
-            phase_t = _ease_out((fi - WALK_F - STOP_F) / (HUG_F - 1))
+            phase_t = ht
+            # Step slightly closer during hug
+            lcx     = int(_lerp(EX_L, KX_L, ht))
+            rcx     = int(_lerp(EX_R, KX_R, ht))
 
         else:
             raw_k   = (fi - WALK_F - STOP_F - HUG_F) / (KISS_F - 1)
-            # Sine arch: rise then hold near peak
             kiss_t  = math.sin(math.pi * raw_k * 0.88)
             phase   = 'kiss'
             phase_t = max(0.0, min(1.0, kiss_t))
-            head_lean = int(phase_t * 20)
+            lcx     = KX_L
+            rcx     = KX_R
+            head_lean = int(phase_t * 22)
 
         # ── Draw both characters ──────────────────────────────────────────
         _draw_person(canvas, first_avatar,
