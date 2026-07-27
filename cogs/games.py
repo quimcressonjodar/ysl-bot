@@ -306,5 +306,85 @@ class GamesCog(commands.Cog):
         await ctx.send(embed=embed)
 
 
+    @commands.hybrid_command(name="guess", description="Guess a number from 0–100 in 5 attempts to win 3× your bet!")
+    @app_commands.describe(bet="Amount to bet ('all', 'half', or a number)")
+    async def guess(self, ctx: commands.Context, bet: str):
+        user_id = str(ctx.author.id)
+        wallet = get_wallet(user_id)
+        parsed_bet = parse_economy_amount(bet, wallet)
+
+        if parsed_bet <= 0:
+            return await ctx.send("❌ Invalid amount.", ephemeral=True)
+        if parsed_bet > wallet:
+            return await ctx.send(f"❌ You only have 🪙 {wallet:,}.", ephemeral=True)
+
+        update_wallet(user_id, -parsed_bet)
+        secret = random.randint(0, 100)
+        remaining = 5
+
+        embed = discord.Embed(
+            title="🔢 Guess the Number!",
+            description=(
+                f"I'm thinking of a number between **0** and **100**.\n"
+                f"You have **5 attempts**. Guess correctly to win 🪙 **{parsed_bet * 3:,}**!\n\n"
+                f"Type your guess in chat."
+            ),
+            color=0x5865F2,
+        )
+        embed.set_footer(text=f"Bet: 🪙 {parsed_bet:,} | Payout if correct: 🪙 {parsed_bet * 3:,}")
+        await ctx.send(embed=embed)
+
+        def check(m: discord.Message) -> bool:
+            return (
+                m.author.id == ctx.author.id
+                and m.channel.id == ctx.channel.id
+                and m.content.strip().lstrip("-").isdigit()
+            )
+
+        while remaining > 0:
+            try:
+                msg = await self.bot.wait_for("message", timeout=30.0, check=check)
+            except asyncio.TimeoutError:
+                embed = discord.Embed(
+                    title="⏰ Time's up!",
+                    description=f"The number was **{secret}**.\nYou lost 🪙 {parsed_bet:,}.",
+                    color=0xFF0000,
+                )
+                return await ctx.send(embed=embed)
+
+            guess_val = int(msg.content.strip())
+
+            if guess_val < 0 or guess_val > 100:
+                await ctx.send("❌ Please guess a number between **0** and **100**. (Attempt not counted)")
+                continue
+
+            remaining -= 1
+
+            if guess_val == secret:
+                winnings = parsed_bet * 3
+                update_wallet(user_id, winnings)
+                embed = discord.Embed(
+                    title="🎉 Correct!",
+                    description=(
+                        f"The number was **{secret}**!\n"
+                        f"You win 🪙 **{winnings:,}** (3× your bet)!"
+                    ),
+                    color=0x00FF00,
+                )
+                return await ctx.send(embed=embed)
+
+            hint = "📈 Too low!" if guess_val < secret else "📉 Too high!"
+
+            if remaining == 0:
+                embed = discord.Embed(
+                    title="❌ Game Over",
+                    description=f"{hint}\nThe number was **{secret}**. You lost 🪙 {parsed_bet:,}.",
+                    color=0xFF0000,
+                )
+                return await ctx.send(embed=embed)
+
+            await ctx.send(f"{hint} **{remaining} attempt{'s' if remaining != 1 else ''}** left.")
+
+
 async def setup(bot: commands.Bot):
     await bot.add_cog(GamesCog(bot))
