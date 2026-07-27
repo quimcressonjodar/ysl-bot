@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import signal
 
 import discord
 from discord.ext import commands
@@ -118,6 +119,17 @@ async def run_bot() -> None:
 
     for attempt in range(1, max_attempts + 1):
         bot = YSLBot()
+
+        # Close the Discord WebSocket immediately on SIGTERM (Render deploy
+        # shutdown) so the old instance disconnects before the new one comes
+        # online. Without this, the lingering gateway connection causes every
+        # command to be answered twice during the overlap window (~60 s).
+        loop = asyncio.get_running_loop()
+        loop.add_signal_handler(
+            signal.SIGTERM,
+            lambda: asyncio.ensure_future(bot.close()),
+        )
+
         try:
             await bot.start(DISCORD_TOKEN)
             return
@@ -150,6 +162,8 @@ async def run_bot() -> None:
                 attempt, max_attempts, retry_after,
             )
             await asyncio.sleep(retry_after)
+        finally:
+            loop.remove_signal_handler(signal.SIGTERM)
 
 
 if __name__ == "__main__":
