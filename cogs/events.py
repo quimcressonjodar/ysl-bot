@@ -212,6 +212,10 @@ class EventsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        # HybridCommand fires on_command_error twice: once with the real error
+        # and once with HybridCommandError wrapping it. Unwrap so we only handle it once.
+        if isinstance(error, commands.HybridCommandError):
+            error = error.original
         if isinstance(error, commands.CommandNotFound):
             return
         from utils.economy import JailCheckError
