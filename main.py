@@ -57,6 +57,7 @@ COGS = [
     "cogs.autoreply",
     "cogs.giveaways",
     "cogs.romance",
+    "cogs.afk",
 ]
 
 

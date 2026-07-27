@@ -23,6 +23,8 @@ giveaways_col  = db["giveaways"]
 bot_guilds_col = db["bot_guilds"]
 dashboard_modules_col = db["dashboard_modules"]
 bot_logs_col = db["bot_logs"]
+afk_col = db["afk"]
+reminders_col = db["reminders"]
 
 # Index for efficient log queries (newest first per guild)
 try:
