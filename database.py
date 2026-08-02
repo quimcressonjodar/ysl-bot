@@ -25,6 +25,7 @@ dashboard_modules_col = db["dashboard_modules"]
 bot_logs_col = db["bot_logs"]
 afk_col = db["afk"]
 reminders_col = db["reminders"]
+reaction_roles_col = db["reaction_roles"]
 
 # Index for efficient log queries (newest first per guild)
 try:

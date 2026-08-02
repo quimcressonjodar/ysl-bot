@@ -58,6 +58,7 @@ COGS = [
     "cogs.giveaways",
     "cogs.romance",
     "cogs.afk",
+    "cogs.reaction_roles",
 ]
 
 

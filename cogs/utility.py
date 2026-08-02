@@ -136,13 +136,18 @@ FINAL_EMBED = _e(
     0xF1C40F,
     [
         ("💸 More income", "`!weekly` (once/week) • `!claim` (hourly, if you own roles)"),
-        ("🎰 Casino", "`!blackjack <bet>` • `!roulette <bet> <choice>` • `!dice <bet>`"),
+        ("🎰 Casino & Games", "`!blackjack <bet>` • `!roulette <bet> <choice>` • `!dice <bet>` • `!guess <bet>` • `!bjpvp @user <bet>` • `!horserace`"),
         ("🚨 Crime", "`!crime` • `!rob @user` — risky but pays more. Going WANTED = others can `!catch` you."),
         ("🐾 Pets", "`!shop` → `!buy <pet>` → `!feed` → `!battle @user` → `!adventures <pet>`"),
         ("🏦 Loans", "`!loan <amount>` → repay with `!repay <amount>` — interest grows over time!"),
         ("🔔 Price alerts", "`!alert <SYMBOL> <price>` — get a DM when a stock hits your target."),
+        ("📊 Leveling", "`!rank` — your XP card • `!lvltop` — XP leaderboard • `!msgtop` — message leaderboard"),
+        ("🎉 Giveaways & Polls", "`!gstart` • `!gend` • `!greroll` • `!glist` • `!poll` • `!quickpoll`"),
+        ("💞 Fun", "`!love @user` • `!kiss @user` • `!8ball <question>`"),
+        ("💤 AFK & Reminders", "`!afk [reason]` — go AFK • `!remindme <time> <text>` — set a reminder"),
+        ("🏢 Business", "`!business shop` → `!business buy <type>` → `!business collect`"),
         ("⭐ Prestige", "Your rank = your total net worth. Higher prestige = lower stock fees."),
-        ("📋 All commands", "Type `!help` anytime to reopen this reference."),
+        ("📋 All commands", "Type `!help` anytime for the full reference."),
     ],
 )
 
@@ -235,6 +240,7 @@ REFERENCE_EMBED = _e(
         ),
         (
             "🎲 More Games",
+            "`!guess <bet>` — guess a number 0–100 in 5 attempts, win 3× your bet\n"
             "`!bjpvp @user <bet>` — challenge another player to a 1v1 blackjack duel\n"
             "`!8ball <question>` — ask the magic 8-ball a question",
         ),
@@ -242,6 +248,51 @@ REFERENCE_EMBED = _e(
             "🏇 Horse Race",
             "`!horserace` or `!horserace start` — open betting on a new multiplayer race\n"
             "`!horserace bet <horse 1-5> <amount>` — bet on a horse before betting closes",
+        ),
+        (
+            "📊 Leveling",
+            "`!rank [@user]` — show your (or someone else's) XP level card\n"
+            "`!lvltop` — leaderboard sorted by level / XP\n"
+            "`!msgtop` — leaderboard sorted by total message count",
+        ),
+        (
+            "🎉 Giveaways",
+            "`!gstart <duration> <winners> <prize>` — start a giveaway\n"
+            "`!gend <message_id>` — end a giveaway early\n"
+            "`!greroll <message_id>` — pick a new winner\n"
+            "`!glist` — list all active giveaways",
+        ),
+        (
+            "📊 Polls",
+            "`!poll <question> | <opt1> | <opt2> ...` — create a timed poll with multiple options\n"
+            "`!quickpoll <question>` — instant yes/no poll",
+        ),
+        (
+            "💞 Fun & Romance",
+            "`!love @user1 @user2` — calculate love compatibility between two members\n"
+            "`!kiss @user1 @user2` — animated kiss GIF",
+        ),
+        (
+            "💤 AFK & Reminders",
+            "`!afk [reason]` — set yourself as AFK; bot notifies anyone who pings/names you\n"
+            "→ Sending any message removes your AFK automatically\n"
+            "`!remindme <duration> <text>` — get reminded after a delay\n"
+            "→ Duration examples: `10m` · `2h` · `1d` · `1h30m`",
+        ),
+        (
+            "🎭 Reaction Roles (Admin)",
+            "`/reactionroles setup #channel` — open a setup modal to create a reaction-roles panel\n"
+            "→ Enter a title + one `emoji | Role Name` pair per line\n"
+            "`/reactionroles remove <message_id>` — delete a panel\n"
+            "`/reactionroles list` — list all active panels in this server",
+        ),
+        (
+            "🛡️ Moderation (Admin)",
+            "`!ban @user [reason]` • `!unban <id>` • `!bans` — ban management\n"
+            "`!kick @user [reason]` — remove a member\n"
+            "`!timeout @user <duration> [reason]` • `!untimeout @user` — mute/unmute\n"
+            "`!warn @user <reason>` • `!warns @user` • `!delwarn <id>` • `!clearwarns @user`\n"
+            "`!purge <amount>` — bulk delete messages",
         ),
         (
             "🏢 Business Empire",
