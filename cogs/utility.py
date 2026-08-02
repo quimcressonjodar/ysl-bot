@@ -281,9 +281,11 @@ REFERENCE_EMBED = _e(
         ),
         (
             "🎭 Reaction Roles (Admin)",
-            "`/reactionroles setup #channel` — open a setup modal to create a reaction-roles panel\n"
+            "`/reactionroles setup #channel` — create a new reaction-roles panel\n"
             "→ Enter a title + one `emoji | Role Name` pair per line\n"
-            "`/reactionroles remove <message_id>` — delete a panel\n"
+            "`/reactionroles edit <message_id>` — edit an existing panel (pre-filled modal)\n"
+            "→ Add new lines to add roles, delete lines to remove them\n"
+            "`/reactionroles remove <message_id>` — delete a panel entirely\n"
             "`/reactionroles list` — list all active panels in this server",
         ),
         (
