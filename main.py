@@ -54,7 +54,6 @@ COGS = [
     "cogs.horserace",
     "cogs.modmail",
     "cogs.leveling",
-    "cogs.autoreply",
     "cogs.giveaways",
     "cogs.romance",
     "cogs.afk",
