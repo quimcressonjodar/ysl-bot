@@ -55,7 +55,7 @@ Users can use both prefix and slash commands:
 !volume <0-1000>
 !loop <off|track|queue>
 !shuffle
-!remove <position>
+!musicremove <position>
 !disconnect
 ```
 
@@ -64,7 +64,7 @@ where the bot is playing to control that server's queue.
 
 `/loop` offers the same modes as the prefix command: **Off**, **Current track**,
 and **Entire queue**. Queue positions shown by `!queue` start at 1, so
-`!remove 2` removes the second upcoming track.
+`!musicremove 2` removes the second upcoming track.
 
 ## 4. Supported sources
 

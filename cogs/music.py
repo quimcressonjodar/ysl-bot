@@ -61,6 +61,15 @@ class MusicCog(commands.Cog):
             # offline. The music commands will explain that the node is down.
             logger.exception("Unable to connect to Lavalink during startup.")
 
+    @staticmethod
+    def _lavalink_unavailable_message() -> str:
+        if not LAVALINK_URI or not LAVALINK_PASSWORD:
+            return (
+                "Music is not configured yet. An administrator needs to set "
+                "`LAVALINK_URI` and `LAVALINK_PASSWORD`."
+            )
+        return "Music is temporarily unavailable because the Lavalink server is offline."
+
     async def cog_unload(self) -> None:
         """Disconnect any active music players when the cog is unloaded."""
         for guild in list(self.bot.guilds):
@@ -75,10 +84,7 @@ class MusicCog(commands.Cog):
             return None
 
         if not wavelink.Pool.nodes:
-            await ctx.send(
-                "Music is not configured yet. An administrator needs to connect "
-                "the bot to a Lavalink v4 server."
-            )
+            await ctx.send(self._lavalink_unavailable_message())
             return None
 
         voice_state = getattr(ctx.author, "voice", None)
@@ -117,6 +123,10 @@ class MusicCog(commands.Cog):
         """Return the current player without joining a voice channel."""
         if ctx.guild is None:
             await ctx.send("Music commands can only be used inside a server.")
+            return None
+
+        if not wavelink.Pool.nodes:
+            await ctx.send(self._lavalink_unavailable_message())
             return None
 
         player = cast(wavelink.Player | None, ctx.voice_client)
@@ -331,11 +341,11 @@ class MusicCog(commands.Cog):
         await ctx.send("Shuffled the upcoming queue.")
 
     @commands.hybrid_command(
-        name="remove",
+        name="musicremove",
         description="Remove a track from the upcoming queue.",
     )
     @app_commands.describe(position="The queue position to remove, starting at 1")
-    async def remove(self, ctx: commands.Context, position: int) -> None:
+    async def musicremove(self, ctx: commands.Context, position: int) -> None:
         player = await self._get_existing_player(ctx)
         if player is None:
             return
