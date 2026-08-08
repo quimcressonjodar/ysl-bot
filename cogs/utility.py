@@ -296,7 +296,6 @@ HELP_SECTIONS: dict[str, dict] = {
             ("!impostor @member", "Toggle impostor mode (owner only)."),
             ("!say <message>", "Make the bot send a message (admin only)."),
             ("!sayembed <options>", "Send a customizable embed (admin only)."),
-            ("!raise", "Hidden stock-control command."),
         ],
     },
 }
