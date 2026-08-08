@@ -151,169 +151,300 @@ FINAL_EMBED = _e(
     ],
 )
 
-# Reference-only embed (shown by !help without tutorial flow)
-REFERENCE_EMBED = _e(
-    "📖 Economy — Command Guide",
-    "Every command explained. Use `!tutorial` for the step-by-step interactive walkthrough.",
-    0x2B2D31,
-    [
-        (
-            "💰 Free Income",
-            "`!daily` — ~1,000 🪙 every 24 h\n"
-            "`!weekly` — ~25,000 🪙 once per week\n"
-            "`!claim` — hourly bonus if you own income roles from the shop",
+# ── Interactive help menu ────────────────────────────────────────────────────
+#
+# Keep this catalog explicit instead of reading bot.commands at runtime.  That
+# lets the help menu group nested commands intentionally and keeps private
+# implementation commands out of the user-facing description by accident.
+HELP_SECTIONS: dict[str, dict] = {
+    "economy": {
+        "label": "Economy",
+        "emoji": "💰",
+        "color": 0xF1C40F,
+        "description": "Coins, pets, businesses, games, stocks, bounties, and horse races.",
+        "commands": [
+            ("!balance", "View your wallet, bank, net worth, and prestige."),
+            ("!deposit <amount|all|half>", "Move coins from your wallet into the bank."),
+            ("!withdraw <amount|all|half>", "Withdraw coins from your bank."),
+            ("!daily", "Claim your daily free coins."),
+            ("!weekly", "Claim your weekly reward."),
+            ("!claim", "Claim rewards from your income roles."),
+            ("!pay @member <amount>", "Send coins to another member."),
+            ("!leaderboard", "View the richest members."),
+            ("!work", "Work a random job to earn coins."),
+            ("!crime", "Attempt a risky crime for a larger payout."),
+            ("!rob @member", "Attempt to rob another member's wallet."),
+            ("!catch @member", "Catch a wanted criminal for a reward."),
+            ("!inventory", "View the items in your inventory."),
+            ("!sell <item>", "Sell an item from your inventory."),
+            ("!claimdrop", "Claim the active global coin or item drop."),
+            ("!loan <amount|max>", "Borrow coins from the clan bank."),
+            ("!repay <amount|all|half>", "Repay some or all of your loan."),
+            ("!debt", "Check your current debt and interest."),
+            ("!prestige", "View your wealth prestige milestones."),
+            ("!shop / !buy", "Browse the pet and role shop or buy an item."),
+            ("!pets", "View your pets, stats, hunger, and status."),
+            ("!feed <pet> <food>", "Feed one of your pets."),
+            ("!battle @member", "Battle another member's pet."),
+            ("!adventures <pet>", "Send a pet on an adventure for rewards."),
+            ("!sell_pet <pet>", "Sell one of your pets."),
+            ("!breed <pet1> <pet2>", "Breed two pets into a stronger offspring."),
+            ("!business", "Open the business empire command group."),
+            ("!business shop", "Browse available business types."),
+            ("!business buy <type> [name]", "Purchase a new business."),
+            ("!business list [@member]", "List businesses owned by a member."),
+            ("!business info <id>", "View full stats for a business."),
+            ("!business collect [id]", "Collect income from one or all businesses."),
+            ("!business upgrades <id>", "View available upgrades."),
+            ("!business upgrade <id> <upgrade>", "Purchase a business upgrade."),
+            ("!business hire <id>", "Hire a random NPC worker."),
+            ("!business fire <id> <worker>", "Fire a business worker."),
+            ("!business sell <id>", "Sell a business."),
+            ("!business rename <id> <name>", "Rename a business."),
+            ("!business visit @member", "Visit another member's business."),
+            ("!business leaderboard", "View the top businesses."),
+            ("!business help", "View the business command guide."),
+            ("!roulette <bet> <choice>", "Bet on the casino roulette wheel."),
+            ("!blackjack <bet>", "Play blackjack against the dealer."),
+            ("!bjpvp @member <bet>", "Challenge another member to blackjack PvP."),
+            ("!dice <bet>", "Roll two dice against the house."),
+            ("!guess <bet>", "Guess a number from 0–100 in five attempts."),
+            ("!8ball <question>", "Ask the magic 8-ball a question."),
+            ("!horserace", "Open the multiplayer horse-race betting menu."),
+            ("!horserace start", "Start a horse race with betting."),
+            ("!horserace bet <horse> <amount>", "Place a bet on the active race."),
+            ("!bounties", "View active bounty contracts and progress."),
+            ("!stocks", "View the stock market."),
+            ("!sbuy <symbol> <quantity>", "Buy shares from the market."),
+            ("!ssell <symbol> <quantity>", "Sell shares to the market."),
+            ("!portfolio", "View your stock portfolio."),
+            ("!alert <symbol> <price>", "Get a DM when a stock reaches a price."),
+            ("!myalerts", "View your active stock alerts."),
+            ("!cancelalert <id>", "Cancel a stock price alert."),
+            ("!autosell <symbol> <quantity> <price>", "Create an automatic sell order."),
+            ("!myautosells", "View your active automatic sell orders."),
+            ("!cancelautosell <id>", "Cancel an automatic sell order."),
+            ("!ipo", "List a new company on the market (admin only)."),
+        ],
+    },
+    "moderation": {
+        "label": "Moderation",
+        "emoji": "🛡️",
+        "color": 0xE74C3C,
+        "description": "Server moderation, warnings, admin economy controls, and staff tickets.",
+        "commands": [
+            ("!ban @member [reason]", "Ban a member (admin only)."),
+            ("!unban <user_id>", "Unban a user (admin only)."),
+            ("!bans", "List banned users (admin only)."),
+            ("!kick @member [reason]", "Kick a member (admin only)."),
+            ("!timeout @member <duration> [reason]", "Temporarily timeout a member."),
+            ("!untimeout @member", "Remove a member's timeout."),
+            ("!purge <amount>", "Bulk-delete messages."),
+            ("!warn @member <reason>", "Issue a warning."),
+            ("!warns @member", "View a member's warning history."),
+            ("!delwarn <warn_id>", "Delete a specific warning."),
+            ("!clearwarns @member", "Clear all warnings for a member."),
+            ("!add @member <amount>", "Add coins to a member (admin only)."),
+            ("!remove @member <amount>", "Remove coins from a member (admin only)."),
+            ("!reset_economy", "Reset economy, pets, stocks, businesses, and bounties."),
+            ("!setuproles", "Create the shop roles (admin only)."),
+            ("!leaveserver <server_id>", "Make the bot leave a server (owner only)."),
+            ("DM the bot", "Start a private modmail conversation with staff."),
+            ("!close", "Close the current modmail ticket (staff only)."),
+            ("!delete", "Delete the current modmail ticket (staff only)."),
+        ],
+    },
+    "utilities": {
+        "label": "Utilities",
+        "emoji": "🧰",
+        "color": 0x3498DB,
+        "description": "Levels, giveaways, polls, reminders, reaction roles, starboard, and bot tools.",
+        "commands": [
+            ("!help", "Open this interactive command guide."),
+            ("!tutorial", "Start the step-by-step economy tutorial."),
+            ("!botstats", "View bot latency, uptime, servers, and members."),
+            ("!afk [reason]", "Set your AFK status."),
+            ("!remindme <duration> <text>", "Set a reminder for later."),
+            ("!rank [@member]", "View a member's level card."),
+            ("!lvltop [page]", "View the XP and level leaderboard."),
+            ("!msgtop [page]", "View the message-count leaderboard."),
+            ("/createlevelroles", "Create level milestone roles (admin only)."),
+            ("!gstart <duration> <winners> <prize>", "Start a giveaway."),
+            ("!gend <message_id>", "End a giveaway early."),
+            ("!greroll <message_id>", "Reroll a giveaway winner."),
+            ("!glist", "List active giveaways."),
+            ("!poll <duration> <question> <options>", "Create a timed multi-option poll."),
+            ("!quickpoll <question>", "Create a yes/no poll."),
+            ("/reactionroles", "Open the reaction-role command group."),
+            ("/reactionroles setup <channel>", "Create a reaction-role panel."),
+            ("/reactionroles edit <message_id>", "Edit an existing reaction-role panel."),
+            ("/reactionroles remove <message_id>", "Remove a reaction-role panel."),
+            ("/reactionroles list", "List reaction-role panels in this server."),
+            ("!starboard", "Open the starboard command group."),
+            ("!starboard setup", "Set up or update the starboard."),
+            ("!starboard config", "View the current starboard configuration."),
+        ],
+    },
+    "other": {
+        "label": "Other",
+        "emoji": "✨",
+        "color": 0x9B59B6,
+        "description": "Fun commands, owner tools, and custom message commands.",
+        "commands": [
+            ("!love @member [@member]", "Calculate love compatibility."),
+            ("!kiss @member [@member]", "Create an animated kiss GIF."),
+            ("!impostor @member", "Toggle impostor mode (owner only)."),
+            ("!say <message>", "Make the bot send a message (admin only)."),
+            ("!sayembed <options>", "Send a customizable embed (admin only)."),
+            ("!raise", "Hidden stock-control command."),
+        ],
+    },
+}
+
+HELP_COMMANDS_PER_PAGE = 12
+
+
+def _help_embed(
+    section_key: str,
+    page: int,
+    requester: discord.abc.User,
+) -> tuple[discord.Embed, int]:
+    section = HELP_SECTIONS[section_key]
+    commands_in_section = section["commands"]
+    page_count = max(1, (len(commands_in_section) + HELP_COMMANDS_PER_PAGE - 1) // HELP_COMMANDS_PER_PAGE)
+    page = max(0, min(page, page_count - 1))
+    start = page * HELP_COMMANDS_PER_PAGE
+    page_commands = commands_in_section[start:start + HELP_COMMANDS_PER_PAGE]
+
+    embed = discord.Embed(
+        title=f"{section['emoji']} {section['label']} Commands",
+        description=(
+            f"{section['description']}\n\n"
+            "Use the buttons below to switch sections. "
+            "Commands marked with `/` are slash-only."
         ),
-        (
-            "🏦 Balance & Banking",
-            "`!balance` — wallet, bank, net worth and prestige level\n"
-            "`!deposit <amount|all>` — move coins from wallet → bank (safe from robbers)\n"
-            "`!withdraw <amount|all>` — take coins out of the bank\n"
-            "`!pay @user <amount>` — send coins directly to someone\n"
-            "`!leaderboard` — richest players ranked by net worth",
-        ),
-        (
-            "💼 Work & Crime",
-            "`!work` — random job, earns coins on a cooldown. 100% safe.\n"
-            "`!crime` — attempt a crime for 2k–6.5k 🪙. Fail → fine + WANTED 🚨\n"
-            "`!rob @user` — steal from someone's wallet. Fail → fine + WANTED 🚨\n"
-            "`!catch @user` — catch a WANTED player for a reward (15 min cooldown)\n"
-            "⚠️ WANTED = anyone can catch you and take a reward from your wallet. Deposit fast!",
-        ),
-        (
-            "🎰 Casino",
-            "`!blackjack <bet>` — beat the dealer to 21. Win = 2× your bet\n"
-            "`!roulette <bet> <red/black/even/odd/number/1st12/2nd12/3rd12>` — up to 36× payout\n"
-            "`!dice <bet>` — roll against the house\n"
-            "`!claimdrop` — grab a global coin/item drop before anyone else (admin-triggered)",
-        ),
-        (
-            "🎯 Bounties",
-            "`!bounties` — view active contracts and your progress on each\n"
-            "Progress is tracked automatically as you play. Examples: *work 10 times*, "
-            "*catch a criminal*, *win at blackjack*. Completing a contract pays a big reward.",
-        ),
-        (
-            "🐾 Pets",
-            "`!shop` — browse pets, food and roles for sale\n"
-            "`!buy <pet>` — purchase a pet (coins from wallet)\n"
-            "`!pets` — view all your pets: HP, damage, hunger, status\n"
-            "`!feed <pet> <food>` — restore hunger (hungry pets lose stats)\n"
-            "`!breed <pet1> <pet2>` — combine two pets into a stronger offspring\n"
-            "`!battle @user` — your strongest pet fights theirs. Winner earns coins\n"
-            "`!adventures <pet>` — send a pet to find coins, food or rare loot\n"
-            "`!sell_pet <pet>` — sell a pet for 50% of its shop price",
-        ),
-        (
-            "📈 Stocks",
-            "`!stocks` — all companies: price, daily % change\n"
-            "`!stocks <SYMBOL>` — detailed view of one stock\n"
-            "`!sbuy <SYMBOL> <amount|all>` — buy shares\n"
-            "`!ssell <SYMBOL> <amount|all>` — sell shares\n"
-            "`!portfolio` — your holdings, current value, total profit/loss\n"
-            "`!alert <SYMBOL> <price>` — DM alert when a stock hits your target\n"
-            "`!myalerts` — see your active alerts (shows ID 1, 2, 3…)\n"
-            "`!cancelalert <id>` — remove an alert by its short number\n"
-            "`!autosell <SYMBOL> <quantity> <target>` — auto-sell shares when price reaches target\n"
-            "`!myautosells` — see your pending auto-sell orders\n"
-            "`!cancelautosell <id>` — cancel an auto-sell order\n"
-            "📅 Dividends paid daily: 0.05%–2% depending on company performance",
-        ),
-        (
-            "🏦 Loans",
-            "`!loan <amount>` — borrow coins instantly (interest accrues over time)\n"
-            "`!repay <amount>` — pay back part or all of your debt\n"
-            "`!debt` — check your outstanding balance and accrued interest\n"
-            "⚠️ Debt compounds — only borrow if you have a plan to repay.",
-        ),
-        (
-            "🎒 Inventory & Shop",
-            "`!inventory` — items you own: food, loot, resale value\n"
-            "`!sell` — sell an item from your inventory for coins",
-        ),
-        (
-            "⭐ Prestige & Stats",
-            "`!prestige` — see every wealth milestone and which ones you've unlocked\n"
-            "`!balance` — also shows your current prestige level (based on total net worth)\n"
-            "Higher prestige = lower stock trading fees (up to −90% at max rank)\n"
-            "`!botstats` — bot ping, uptime, server count\n"
-            "`!tutorial` — restart the interactive step-by-step walkthrough",
-        ),
-        (
-            "🎲 More Games",
-            "`!guess <bet>` — guess a number 0–100 in 5 attempts, win 3× your bet\n"
-            "`!bjpvp @user <bet>` — challenge another player to a 1v1 blackjack duel\n"
-            "`!8ball <question>` — ask the magic 8-ball a question",
-        ),
-        (
-            "🏇 Horse Race",
-            "`!horserace` or `!horserace start` — open betting on a new multiplayer race\n"
-            "`!horserace bet <horse 1-5> <amount>` — bet on a horse before betting closes",
-        ),
-        (
-            "📊 Leveling",
-            "`!rank [@user]` — show your (or someone else's) XP level card\n"
-            "`!lvltop` — leaderboard sorted by level / XP\n"
-            "`!msgtop` — leaderboard sorted by total message count",
-        ),
-        (
-            "🎉 Giveaways",
-            "`!gstart <duration> <winners> <prize>` — start a giveaway\n"
-            "`!gend <message_id>` — end a giveaway early\n"
-            "`!greroll <message_id>` — pick a new winner\n"
-            "`!glist` — list all active giveaways",
-        ),
-        (
-            "📊 Polls",
-            "`!poll <question> | <opt1> | <opt2> ...` — create a timed poll with multiple options\n"
-            "`!quickpoll <question>` — instant yes/no poll",
-        ),
-        (
-            "💞 Fun & Romance",
-            "`!love @user1 @user2` — calculate love compatibility between two members\n"
-            "`!kiss @user1 @user2` — animated kiss GIF",
-        ),
-        (
-            "💤 AFK & Reminders",
-            "`!afk [reason]` — set yourself as AFK; bot notifies anyone who pings/names you\n"
-            "→ Sending any message removes your AFK automatically\n"
-            "`!remindme <duration> <text>` — get reminded after a delay\n"
-            "→ Duration examples: `10m` · `2h` · `1d` · `1h30m`",
-        ),
-        (
-            "🎭 Reaction Roles (Admin)",
-            "`/reactionroles setup #channel` — create a new reaction-roles panel\n"
-            "→ Enter a title + one `emoji | Role Name` pair per line\n"
-            "`/reactionroles edit <message_id>` — edit an existing panel (pre-filled modal)\n"
-            "→ Add new lines to add roles, delete lines to remove them\n"
-            "`/reactionroles remove <message_id>` — delete a panel entirely\n"
-            "`/reactionroles list` — list all active panels in this server",
-        ),
-        (
-            "🛡️ Moderation (Admin)",
-            "`!ban @user [reason]` • `!unban <id>` • `!bans` — ban management\n"
-            "`!kick @user [reason]` — remove a member\n"
-            "`!timeout @user <duration> [reason]` • `!untimeout @user` — mute/unmute\n"
-            "`!warn @user <reason>` • `!warns @user` • `!delwarn <id>` • `!clearwarns @user`\n"
-            "`!purge <amount>` — bulk delete messages",
-        ),
-        (
-            "🏢 Business Empire",
-            "`!business shop` — browse business types you can open\n"
-            "`!business buy <type> [name]` — open a new business\n"
-            "`!business list` — see all businesses you own\n"
-            "`!business info <id>` — full stats for one business\n"
-            "`!business collect` — collect income from your businesses\n"
-            "`!business upgrade <id> <upgrade>` — upgrade a business\n"
-            "`!business hire <id>` / `!business fire <id> <worker>` — manage workers\n"
-            "`!business help` — full list of every business subcommand",
-        ),
-        (
-            "📬 Modmail",
-            "DM the bot directly to start a private conversation with staff.\n"
-            "`!close` — (staff, inside a ticket channel) closes the modmail ticket",
-        ),
-    ],
-)
+        color=section["color"],
+    )
+    for command_name, command_description in page_commands:
+        embed.add_field(
+            name=f"`{command_name}`",
+            value=command_description,
+            inline=False,
+        )
+    embed.set_footer(
+        text=f"Page {page + 1}/{page_count} • Requested by {requester.display_name}",
+        icon_url=requester.display_avatar.url,
+    )
+    return embed, page_count
+
+
+class HelpView(discord.ui.View):
+    def __init__(self, author_id: int, requester: discord.abc.User):
+        super().__init__(timeout=180)
+        self.author_id = author_id
+        self.requester = requester
+        self.section_key = "economy"
+        self.page = 0
+        self.message: discord.Message | None = None
+        self._build_buttons()
+
+    async def _check_user(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.author_id:
+            return True
+        await interaction.response.send_message(
+            "This help menu belongs to the person who opened it.",
+            ephemeral=True,
+        )
+        return False
+
+    async def _select_section(self, interaction: discord.Interaction, section_key: str):
+        if not await self._check_user(interaction):
+            return
+        self.section_key = section_key
+        self.page = 0
+        await self._refresh(interaction)
+
+    async def _change_page(self, interaction: discord.Interaction, delta: int):
+        if not await self._check_user(interaction):
+            return
+        page_count = max(
+            1,
+            (len(HELP_SECTIONS[self.section_key]["commands"]) + HELP_COMMANDS_PER_PAGE - 1)
+            // HELP_COMMANDS_PER_PAGE,
+        )
+        self.page = max(0, min(self.page + delta, page_count - 1))
+        await self._refresh(interaction)
+
+    async def _refresh(self, interaction: discord.Interaction):
+        embed, _ = _help_embed(self.section_key, self.page, self.requester)
+        self._build_buttons()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    def _build_buttons(self):
+        self.clear_items()
+
+        section_buttons = [
+            ("economy", "Economy", "💰", discord.ButtonStyle.success),
+            ("moderation", "Moderation", "🛡️", discord.ButtonStyle.danger),
+            ("utilities", "Utilities", "🧰", discord.ButtonStyle.primary),
+            ("other", "Other", "✨", discord.ButtonStyle.secondary),
+        ]
+        for section_key, label, emoji, style in section_buttons:
+            button = discord.ui.Button(
+                label=label,
+                emoji=emoji,
+                style=style,
+                disabled=self.section_key == section_key,
+                row=0,
+            )
+
+            async def callback(
+                interaction: discord.Interaction,
+                key: str = section_key,
+            ):
+                await self._select_section(interaction, key)
+
+            button.callback = callback
+            self.add_item(button)
+
+        previous = discord.ui.Button(
+            label="Previous",
+            emoji="◀️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page == 0,
+            row=1,
+        )
+        next_button = discord.ui.Button(
+            label="Next",
+            emoji="▶️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page >= max(
+                1,
+                (len(HELP_SECTIONS[self.section_key]["commands"]) + HELP_COMMANDS_PER_PAGE - 1)
+                // HELP_COMMANDS_PER_PAGE,
+            ) - 1,
+            row=1,
+        )
+
+        async def previous_callback(interaction: discord.Interaction):
+            await self._change_page(interaction, -1)
+
+        async def next_callback(interaction: discord.Interaction):
+            await self._change_page(interaction, 1)
+
+        previous.callback = previous_callback
+        next_button.callback = next_callback
+        self.add_item(previous)
+        self.add_item(next_button)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
 
 # ---------------------------------------------------------------------------
@@ -396,10 +527,13 @@ class UtilityCog(commands.Cog):
 
     @commands.hybrid_command(
         name="help",
-        description="Quick command reference. Use !tutorial for the interactive walkthrough.",
+        description="Open the interactive command guide.",
     )
     async def help_command(self, ctx: commands.Context):
-        await ctx.send(embed=REFERENCE_EMBED)
+        view = HelpView(ctx.author.id, ctx.author)
+        embed, _ = _help_embed("economy", 0, ctx.author)
+        message = await ctx.send(embed=embed, view=view)
+        view.message = message
 
     # ── Command completion listener ──────────────────────────────────────────
 
