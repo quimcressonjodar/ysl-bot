@@ -285,6 +285,22 @@ HELP_SECTIONS: dict[str, dict] = {
             ("!starboard config", "View the current starboard configuration."),
         ],
     },
+    "music": {
+        "label": "Music",
+        "emoji": "🎵",
+        "color": 0x9B59B6,
+        "description": "Join a voice channel and listen to music together.",
+        "commands": [
+            ("!play <song or URL>", "Play a track or add it to the queue."),
+            ("!queue", "Show the upcoming tracks."),
+            ("!nowplaying", "Show the current track."),
+            ("!skip", "Skip the current track."),
+            ("!pause / !resume", "Pause or resume playback."),
+            ("!stop", "Stop playback and clear the queue."),
+            ("!volume <0-1000>", "Set the music volume."),
+            ("!disconnect", "Make the bot leave voice chat."),
+        ],
+    },
     "other": {
         "label": "Other",
         "emoji": "✨",

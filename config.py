@@ -11,6 +11,13 @@ DEFAULT_WEEKLY_XP_REQUIREMENT = 30_000
 WEEKLY_XP_REQUIREMENT = int(os.getenv("WEEKLY_XP_REQUIREMENT", str(DEFAULT_WEEKLY_XP_REQUIREMENT)))
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 
+# ── Music / Lavalink ─────────────────────────────────────────────────────────
+# Use a Lavalink v4 URL, for example: https://lavalink.example.com:443
+# Leave these empty to disable music without preventing the bot from starting.
+LAVALINK_URI = os.getenv("LAVALINK_URI", "").strip()
+LAVALINK_PASSWORD = os.getenv("LAVALINK_PASSWORD", "")
+LAVALINK_IDENTIFIER = os.getenv("LAVALINK_IDENTIFIER", "ysl-lavalink").strip()
+
 WELCOME_CHANNEL_ID = 1513634912861950093
 RULES_CHANNEL_ID = 1512990947187622060
 JOIN_APPLY_CHANNEL_ID = 1515467362097434715
