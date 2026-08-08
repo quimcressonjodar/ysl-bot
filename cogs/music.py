@@ -20,6 +20,8 @@ from config import LAVALINK_IDENTIFIER, LAVALINK_PASSWORD, LAVALINK_URI
 
 
 logger = logging.getLogger("weekly-xp-bot.music")
+MUSIC_COLOR = 0x9B59B6
+MAX_QUEUE_PREVIEW = 10
 
 
 class MusicCog(commands.Cog):
@@ -51,7 +53,7 @@ class MusicCog(commands.Cog):
                 cache_capacity=100,
             )
             if nodes:
-                logger.info("Connected to Lavalink node(s): %s", ", ".join(nodes))
+                logger.info("Connected to Lavalink node(s): %s", ", ".join(nodes.keys()))
             else:
                 logger.error("Lavalink returned no connected nodes.")
         except Exception:
@@ -157,15 +159,19 @@ class MusicCog(commands.Cog):
             label = f"**{tracks[0].title}**"
 
         if player.current or player.queue:
+            position = len(player.queue) + 1
             await player.queue.put_wait(tracks)
-            await ctx.send(f"Added {len(tracks)} track(s) from {label} to the queue.")
+            await ctx.send(
+                f"Added {len(tracks)} track(s) from {label} to the queue "
+                f"starting at position **{position}**."
+            )
             return
 
         first_track = tracks[0]
         await player.play(first_track)
         if len(tracks) > 1:
             await player.queue.put_wait(tracks[1:])
-        await ctx.send(f"Starting **{first_track.title}**.")
+        await ctx.send(f"Queued **{first_track.title}**. Starting playback now.")
 
     @commands.hybrid_command(name="skip", description="Skip the currently playing track.")
     async def skip(self, ctx: commands.Context) -> None:
@@ -175,6 +181,8 @@ class MusicCog(commands.Cog):
         skipped = await player.skip()
         if skipped:
             await ctx.send(f"Skipped **{skipped.title}**.")
+        else:
+            await ctx.send("There is no track playing right now.")
 
     @commands.hybrid_command(name="pause", description="Pause the current track.")
     async def pause(self, ctx: commands.Context) -> None:
@@ -204,7 +212,8 @@ class MusicCog(commands.Cog):
         if player is None:
             return
         player.queue.clear()
-        await player.skip()
+        player.queue.mode = wavelink.QueueMode.normal
+        await player.skip(force=True)
         await ctx.send("Stopped playback and cleared the queue.")
 
     @commands.hybrid_command(name="queue", description="Show the upcoming music queue.")
@@ -216,7 +225,7 @@ class MusicCog(commands.Cog):
         lines = []
         if player.current:
             lines.append(f"**Now:** {player.current.title}")
-        upcoming = list(player.queue)[:10]
+        upcoming = list(player.queue)[:MAX_QUEUE_PREVIEW]
         if upcoming:
             lines.extend(
                 f"`{index}.` {track.title}"
@@ -230,8 +239,10 @@ class MusicCog(commands.Cog):
             description="\n".join(lines),
             color=0x9B59B6,
         )
-        if len(player.queue) > 10:
-            embed.set_footer(text=f"{len(player.queue) - 10} more track(s) in the queue")
+        if len(player.queue) > MAX_QUEUE_PREVIEW:
+            embed.set_footer(
+                text=f"{len(player.queue) - MAX_QUEUE_PREVIEW} more track(s) in the queue"
+            )
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="nowplaying", description="Show the currently playing track.")
@@ -244,7 +255,7 @@ class MusicCog(commands.Cog):
             return
 
         track = player.current
-        embed = discord.Embed(title="Now playing", color=0x9B59B6)
+        embed = discord.Embed(title="Now playing", color=MUSIC_COLOR)
         embed.description = f"**{track.title}** by `{track.author}`"
         if track.uri:
             embed.url = track.uri
@@ -269,6 +280,72 @@ class MusicCog(commands.Cog):
             return
         await player.set_volume(level)
         await ctx.send(f"Volume set to **{level}%**.")
+
+    @commands.hybrid_command(
+        name="loop",
+        description="Set the repeat mode for the current music queue.",
+    )
+    @app_commands.describe(mode="Repeat one track, the whole queue, or turn looping off")
+    @app_commands.choices(
+        mode=[
+            app_commands.Choice(name="Off", value="off"),
+            app_commands.Choice(name="Current track", value="track"),
+            app_commands.Choice(name="Entire queue", value="queue"),
+        ]
+    )
+    async def loop(self, ctx: commands.Context, mode: str) -> None:
+        player = await self._get_existing_player(ctx)
+        if player is None:
+            return
+
+        if mode == "track":
+            if player.current is None:
+                await ctx.send("There is no current track to repeat.")
+                return
+            player.queue.mode = wavelink.QueueMode.loop
+            label = "the current track"
+        elif mode == "queue":
+            if player.current is None and not player.queue:
+                await ctx.send("There is no music to loop.")
+                return
+            player.queue.mode = wavelink.QueueMode.loop_all
+            label = "the entire queue"
+        else:
+            player.queue.mode = wavelink.QueueMode.normal
+            label = "off"
+
+        await ctx.send(f"Looping set to **{label}**.")
+
+    @commands.hybrid_command(
+        name="shuffle",
+        description="Shuffle the upcoming tracks in the queue.",
+    )
+    async def shuffle(self, ctx: commands.Context) -> None:
+        player = await self._get_existing_player(ctx)
+        if player is None:
+            return
+        if len(player.queue) < 2:
+            await ctx.send("Add at least two upcoming tracks before shuffling.")
+            return
+        player.queue.shuffle()
+        await ctx.send("Shuffled the upcoming queue.")
+
+    @commands.hybrid_command(
+        name="remove",
+        description="Remove a track from the upcoming queue.",
+    )
+    @app_commands.describe(position="The queue position to remove, starting at 1")
+    async def remove(self, ctx: commands.Context, position: int) -> None:
+        player = await self._get_existing_player(ctx)
+        if player is None:
+            return
+        if position < 1 or position > len(player.queue):
+            await ctx.send(f"Choose a queue position from **1** to **{len(player.queue)}**.")
+            return
+
+        track = player.queue[position - 1]
+        player.queue.delete(position - 1)
+        await ctx.send(f"Removed **{track.title}** from the queue.")
 
     @commands.hybrid_command(name="disconnect", aliases=["leave"], description="Leave the voice channel.")
     async def disconnect(self, ctx: commands.Context) -> None:
@@ -297,7 +374,21 @@ class MusicCog(commands.Cog):
         if not isinstance(channel, discord.abc.Messageable):
             return
         track = payload.track
-        await channel.send(f"Now playing **{track.title}** by `{track.author}`.")
+        embed = discord.Embed(
+            title="Now playing",
+            description=f"**{track.title}** by `{track.author}`",
+            color=MUSIC_COLOR,
+        )
+        if track.uri:
+            embed.url = track.uri
+        if track.artwork:
+            embed.set_thumbnail(url=track.artwork)
+        if not track.is_stream:
+            total_seconds = track.length // 1000
+            embed.set_footer(
+                text=f"Length {total_seconds // 60}:{total_seconds % 60:02d}"
+            )
+        await channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_wavelink_track_end(self, payload: wavelink.TrackEndEventPayload) -> None:
@@ -306,19 +397,26 @@ class MusicCog(commands.Cog):
         if not player or payload.reason == "replaced":
             return
 
+        # Wavelink's own player loop advances loop and loop-all modes after
+        # dispatching this event. Let it handle those modes so a queue does
+        # not advance twice or announce a false "queue finished" message.
+        if player.queue.mode in {wavelink.QueueMode.loop, wavelink.QueueMode.loop_all}:
+            return
+
         if player.queue:
             next_track = player.queue.get()
             try:
                 await player.play(next_track)
             except Exception:
                 logger.exception("Unable to play the next queued track in guild %s", player.guild)
+                await self._send_to_guild_channel(
+                    player.guild.id,
+                    "I couldn't start the next track. The queue is paused until you try `/skip`.",
+                )
             return
 
         if payload.reason not in {"stopped", "cleanup"} and player.guild:
-            channel_id = self.text_channels.get(player.guild.id)
-            channel = self.bot.get_channel(channel_id) if channel_id else None
-            if isinstance(channel, discord.abc.Messageable):
-                await channel.send("The queue is finished.")
+            await self._send_to_guild_channel(player.guild.id, "The queue is finished.")
 
     @commands.Cog.listener()
     async def on_wavelink_track_exception(self, payload: wavelink.TrackExceptionEventPayload) -> None:
@@ -327,6 +425,18 @@ class MusicCog(commands.Cog):
             payload.player.guild if payload.player and payload.player.guild else "unknown",
             payload.exception,
         )
+        if payload.player and payload.player.guild:
+            await self._send_to_guild_channel(
+                payload.player.guild.id,
+                f"I couldn't play **{payload.track.title}**. Lavalink reported a track error.",
+            )
+
+    async def _send_to_guild_channel(self, guild_id: int, message: str) -> None:
+        """Send a status update to the last text channel used for music."""
+        channel_id = self.text_channels.get(guild_id)
+        channel = self.bot.get_channel(channel_id) if channel_id else None
+        if isinstance(channel, discord.abc.Messageable):
+            await channel.send(message)
 
 
 async def setup(bot: commands.Bot) -> None:
