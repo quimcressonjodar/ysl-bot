@@ -103,6 +103,13 @@ class StockView(discord.ui.View):
         cost_num, gain_num, fee_den = _fee_parts(level)
 
         if side == "buy":
+            if price <= 0:
+                msg = (
+                    f"❌ **{self.symbol}** is currently worthless ({price:,} coins). "
+                    "Buying is unavailable until its price rises above zero."
+                )
+                return await target.response.send_message(msg, ephemeral=True) if is_interaction else await target.send(msg)
+
             total_cost = price * quantity * cost_num // fee_den
             if wallet < total_cost:
                 msg = f"❌ You need 🪙 {total_cost:,} to buy {quantity} shares (including fees)."
@@ -815,7 +822,7 @@ class Stocks(commands.Cog):
             return await ctx.send(f"❌ No price history for `{symbol}`.", delete_after=5)
 
         current = history["prices"][-1]["price"]
-        new_price = max(50, current + amount)
+        new_price = current + amount
 
         # Reshaping the *existing* recent points (previous approach) only
         # fixes the price values, not their timestamps. If a couple of raises
@@ -860,7 +867,7 @@ class Stocks(commands.Cog):
                 point_price = new_price  # land exactly on the target
             else:
                 noise = base * random.uniform(-0.015, 0.015)
-                point_price = max(50, int(base + noise))
+                point_price = int(base + noise)
             new_entries.append({"price": point_price, "timestamp": ts})
 
         prices = kept + new_entries

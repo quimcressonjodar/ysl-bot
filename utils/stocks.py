@@ -104,7 +104,12 @@ def get_current_price(symbol):
 
 
 def update_stock_prices(news_impact=None):
-    """Update prices for all stocks using Geometric Brownian Motion logic."""
+    """Update prices with a signed random-walk model.
+
+    There is intentionally no artificial lower bound.  A minimum movement
+    scale near zero prevents a stock from becoming permanently stuck at zero
+    and allows a crash to continue into negative territory.
+    """
     if news_impact is None:
         news_impact = {}
 
@@ -124,7 +129,8 @@ def update_stock_prices(news_impact=None):
         amplified_multiplier = 1.0 + (multiplier - 1.0) * 1.5
 
         change = random.normalvariate(drift, volatility)
-        new_price = max(50, int(last_price * (1 + change) * amplified_multiplier))
+        movement_scale = max(abs(last_price), 50)
+        new_price = int(last_price + movement_scale * change * amplified_multiplier)
 
         new_entry = {"price": new_price, "timestamp": time.time()}
         current_prices.append(new_entry)

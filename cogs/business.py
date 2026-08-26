@@ -30,6 +30,42 @@ from utils.business import (
 # VIEWS
 # ─────────────────────────────────────────────────────────
 
+
+def _chunk_lines(lines: list[str], max_chars: int = 3800) -> list[str]:
+  """Pack lines into Discord-safe embed descriptions.
+
+  Discord limits an embed description to 4,096 characters.  Keeping some
+  headroom leaves room for formatting changes and prevents a large portfolio
+  from making the entire collect command fail.
+  """
+  chunks: list[str] = []
+  current: list[str] = []
+  current_length = 0
+
+  for line in lines:
+      # Business names are capped, but split defensively if a legacy record
+      # contains an unusually large value.
+      while len(line) > max_chars:
+          if current:
+              chunks.append("\n".join(current))
+              current = []
+              current_length = 0
+          chunks.append(line[:max_chars])
+          line = line[max_chars:]
+
+      line_length = len(line) + (1 if current else 0)
+      if current and current_length + line_length > max_chars:
+          chunks.append("\n".join(current))
+          current = []
+          current_length = 0
+
+      current.append(line)
+      current_length += len(line) + (1 if len(current) > 1 else 0)
+
+  if current:
+      chunks.append("\n".join(current))
+  return chunks or ["Nothing to collect right now."]
+
 class BusinessListView(discord.ui.View):
   """Paginated embed showing all businesses owned by a user."""
   PER_PAGE = 4
@@ -483,16 +519,25 @@ class BusinessCog(commands.Cog):
       if total_net > 0:
           update_wallet(user_id, total_net)
 
-      embed = discord.Embed(
-          title="\U0001f4b0 Income Collected!",
-          description="\n".join(lines) or "Nothing to collect right now.",
-          color=0xF1C40F,
-      )
-      embed.add_field(name="\U0001f4b5 Total", value=f"\U0001fa99 **{total_net:,}**", inline=True)
-      embed.add_field(name="\u2b50 XP",        value=f"**+{total_xp}**",              inline=True)
-      if level_ups:
-          embed.add_field(name="\U0001f3c6 Level Ups!", value="\n".join(level_ups), inline=False)
-      await ctx.send(embed=embed)
+      # A user may own enough businesses for the result to exceed Discord's
+      # 4,096-character description limit.  Send multiple embeds instead of
+      # losing the whole collection to an "Invalid Form Body" error.
+      result_lines = lines + ([""] if lines and level_ups else []) + level_ups
+      pages = _chunk_lines(result_lines)
+      for page_number, description in enumerate(pages, start=1):
+          title = "\U0001f4b0 Income Collected!"
+          if len(pages) > 1:
+              title += f" (Page {page_number}/{len(pages)})"
+
+          embed = discord.Embed(
+              title=title,
+              description=description,
+              color=0xF1C40F,
+          )
+          if page_number == 1:
+              embed.add_field(name="\U0001f4b5 Total", value=f"\U0001fa99 **{total_net:,}**", inline=True)
+              embed.add_field(name="\u2b50 XP", value=f"**+{total_xp}**", inline=True)
+          await ctx.send(embed=embed)
 
   # ── /business upgrades ────────────────────────────────
   @business.command(name="upgrades", description="View all upgrades for a business")
