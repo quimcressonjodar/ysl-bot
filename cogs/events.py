@@ -61,14 +61,12 @@ class EventsCog(commands.Cog):
         channel = self.bot.get_channel(WELCOME_CHANNEL_ID)
         if not channel:
             return
-        member_count = member.guild.member_count
         embed = discord.Embed(
             title=f"Welcome to the server, {member.name}! \U0001f389",
             description=(
                 f"Hello {member.mention}, we are glad to have you here!\n\n"
                 f"\U0001f4dc **First Step:** Please, read the rules in <#{RULES_CHANNEL_ID}>\n"
                 f"\u2694\ufe0f **Want to join?** If you want to apply for the clan, go to <#{JOIN_APPLY_CHANNEL_ID}>\n\n"
-                f"You are our **{member_count}** member!\n\n"
                 f"Enjoy your stay!"
             ),
             color=0x00FFFF,
