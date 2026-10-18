@@ -387,6 +387,11 @@ class BusinessCog(commands.Cog):
       update_wallet(user_id, -cost)
       result = buy_business(user_id, btype_key, name)
 
+      if result.get("error"):
+          # Refund the user since the purchase failed after the deduction
+          update_wallet(user_id, cost)
+          return await ctx.send(f'\u274c {result["error"]}', ephemeral=True)
+
       embed = discord.Embed(
           title='\U0001f389 Business Opened!',
           description=(

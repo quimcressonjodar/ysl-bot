@@ -11,7 +11,7 @@ DEFAULT_WEEKLY_XP_REQUIREMENT = 30_000
 WEEKLY_XP_REQUIREMENT = int(os.getenv("WEEKLY_XP_REQUIREMENT", str(DEFAULT_WEEKLY_XP_REQUIREMENT)))
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 
-WELCOME_CHANNEL_ID = 1513634912861950093
+WELCOME_CHANNEL_ID = 1561113449721761852
 RULES_CHANNEL_ID = 1512990947187622060
 JOIN_APPLY_CHANNEL_ID = 1515467362097434715
 OWNER_IDS = {1436417791615045785, 941697213447421952, 1373879454077685800, 789938929151377428}
@@ -47,7 +47,12 @@ LEVEL_ROLES: dict[int, int] = {
 
 # ── Server boosts ────────────────────────────────────────────────────────────
 # Channel where a thank-you message is posted whenever a member boosts the server.
-BOOST_THANKS_CHANNEL_ID = 1524353296704340048
+BOOST_THANKS_CHANNEL_ID = 1561113449721761853
+
+# ── Starboard ────────────────────────────────────────────────────────────────
+# Default starboard channel used when no per-guild DB config exists.
+STARBOARD_CHANNEL_ID = 1561143041002180749
+STARBOARD_THRESHOLD = 4
 
 # Users allowed to use the !impostor command specifically (in addition to OWNER_IDS)
 IMPOSTOR_ALLOWED_IDS = {941697213447421952, 1373879454077685800, 789938929151377428}

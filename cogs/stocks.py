@@ -16,7 +16,7 @@ from utils.stock_news import get_random_news
 from utils.economy import get_wallet, update_wallet, get_bank, get_prestige_level
 from utils.helpers import is_admin
 
-STOCK_NEWS_CHANNEL_ID = 1513755454029959239
+STOCK_NEWS_CHANNEL_ID = 1561113450812407871
 
 # ---------------------------------------------------------------------------
 # Fee helpers — pure integer arithmetic so huge balances stay exact.

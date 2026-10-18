@@ -16,6 +16,7 @@ businesses_col = db["businesses"]
 
 COLLECTION_INTERVAL = 3600          # 1 hour in seconds
 MAX_ACCUMULATION_HOURS = 24         # income cap
+MAX_BUSINESSES_PER_OWNER = 20       # per-user cap on number of businesses
 
 # XP required to reach next level (index = current level)
 XP_PER_LEVEL = [0, 100, 250, 500, 900, 1_500, 2_500, 4_000, 6_500, 10_000]
@@ -423,6 +424,8 @@ def collect_income(business_id: str) -> dict:
 def buy_business(owner_id: str, btype_key: str, name: str) -> dict:
   if btype_key not in BUSINESS_TYPES:
       return {"error": f"Unknown business type '{btype_key}'."}
+  if businesses_col.count_documents({"owner_id": owner_id}) >= MAX_BUSINESSES_PER_OWNER:
+      return {"error": f"You already own the maximum of {MAX_BUSINESSES_PER_OWNER} businesses."}
   now         = time.time()
   short_id    = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
   business_id = f"{btype_key[:3].upper()}-{short_id}"

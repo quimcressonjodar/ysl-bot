@@ -2,10 +2,19 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from database import starboard_col, starboard_messages_col
+from config import STARBOARD_CHANNEL_ID, STARBOARD_THRESHOLD
 import logging
 from datetime import datetime
 
 logger = logging.getLogger("weekly-xp-bot")
+
+
+def _get_guild_config(guild_id: int) -> dict:
+    """Return starboard config for guild, falling back to defaults."""
+    config = starboard_col.find_one({"guild_id": guild_id})
+    if config and config.get("channel_id"):
+        return config
+    return {"guild_id": guild_id, "channel_id": STARBOARD_CHANNEL_ID, "threshold": STARBOARD_THRESHOLD}
 
 class StarboardCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -32,10 +41,7 @@ class StarboardCog(commands.Cog):
 
     @starboard.command(name="config", description="Show current Starboard configuration")
     async def config(self, ctx: commands.Context):
-        config = starboard_col.find_one({"guild_id": ctx.guild.id})
-        if not config:
-            return await ctx.send("❌ Starboard is not configured for this server.")
-        
+        config = _get_guild_config(ctx.guild.id)
         channel = self.bot.get_channel(config["channel_id"])
         channel_name = channel.mention if channel else "Unknown/Deleted"
         await ctx.send(f"📋 **Starboard Configuration:**\n- **Channel:** {channel_name}\n- **Threshold:** {config['threshold']} ⭐")
@@ -71,9 +77,7 @@ class StarboardCog(commands.Cog):
         if not guild:
             return
 
-        config = starboard_col.find_one({"guild_id": guild.id})
-        if not config or not config.get("channel_id"):
-            return
+        config = _get_guild_config(guild.id)
 
         starboard_channel = self.bot.get_channel(config["channel_id"])
         if not starboard_channel or payload.channel_id == starboard_channel.id:
@@ -137,9 +141,7 @@ class StarboardCog(commands.Cog):
         if not guild:
             return
 
-        config = starboard_col.find_one({"guild_id": guild.id})
-        if not config or not config.get("channel_id"):
-            return
+        config = _get_guild_config(guild.id)
 
         starboard_channel = self.bot.get_channel(config["channel_id"])
         if not starboard_channel:
@@ -181,9 +183,7 @@ class StarboardCog(commands.Cog):
         if not starboard_entry:
             return
 
-        config = starboard_col.find_one({"guild_id": payload.guild_id})
-        if not config or not config.get("channel_id"):
-            return
+        config = _get_guild_config(payload.guild_id)
 
         starboard_channel = self.bot.get_channel(config["channel_id"])
         if not starboard_channel:
