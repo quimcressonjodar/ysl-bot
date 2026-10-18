@@ -62,14 +62,14 @@ class RomanceCog(commands.Cog):
             member1.display_name,
             member2.display_name,
         )
-        file = discord.File(gif, filename="ysl-kiss.gif")
+        file = discord.File(gif, filename="vantage-kiss.gif")
         embed = discord.Embed(
             title="Kiss cam 💋",
             description=f"{member1.mention} kisses {member2.mention}",
             color=0xEC497B,
         )
-        embed.set_image(url="attachment://ysl-kiss.gif")
-        embed.set_footer(text="A tiny YSL love story")
+        embed.set_image(url="attachment://vantage-kiss.gif")
+        embed.set_footer(text="A tiny Vantage love story")
         await ctx.send(embed=embed, file=file)
 
     @staticmethod

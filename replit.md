@@ -1,4 +1,4 @@
-# YSL Bot
+# Vantage Bot
 
 A Discord bot built with `discord.py` using a modular Cog-based architecture. Features include economy, pets, games, stocks, starboard, bounties, and business systems — all backed by MongoDB.
 

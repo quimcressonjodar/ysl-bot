@@ -429,7 +429,7 @@ def render_kiss_gif(
         _draw_sparkles(draw, fi)
 
         # Title
-        _centered_text(draw, "A YSL love story", 24, title_font, PURPLE)
+        _centered_text(draw, "A Vantage love story", 24, title_font, PURPLE)
 
         # ── Resolve phase + per-character values ──────────────────────────
         lcx = EX_L

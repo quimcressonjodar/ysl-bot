@@ -61,7 +61,7 @@ COGS = [
 ]
 
 
-class YSLBot(commands.Bot):
+class VantageBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
@@ -71,7 +71,7 @@ class YSLBot(commands.Bot):
             command_prefix="!",
             intents=intents,
             status=discord.Status.online,
-            activity=discord.Game(name="Grinding for YSL"),
+            activity=discord.Game(name="Grinding for Vantage"),
             help_command=None,
         )
 
@@ -103,7 +103,7 @@ class YSLBot(commands.Bot):
         logger.info(f"✅ Bot connected as {self.user}!")
         await self.change_presence(
             status=discord.Status.online,
-            activity=discord.Game(name="Grinding for YSL"),
+            activity=discord.Game(name="Grinding for Vantage"),
         )
         print(f"READY: {self.user} | {id(self)}")
 
@@ -119,7 +119,7 @@ async def run_bot() -> None:
     base_delay = 60  # seconds
 
     for attempt in range(1, max_attempts + 1):
-        bot = YSLBot()
+        bot = VantageBot()
 
         # Close the Discord WebSocket immediately on SIGTERM (Render deploy
         # shutdown) so the old instance disconnects before the new one comes
