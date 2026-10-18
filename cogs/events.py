@@ -13,13 +13,14 @@ from config import (
     JOIN_APPLY_CHANNEL_ID,
     ADVENTURE_LOOT,
     BOOST_THANKS_CHANNEL_ID,
+    AUTO_JOIN_ROLE_ID,
 )
 from database import eco_col
 from utils.economy import to_decimal128, normalize_economy_doc
 
 logger = logging.getLogger("weekly-xp-bot")
 
-GLOBAL_DROP_CHANNEL_ID = 1513755454029959239
+GLOBAL_DROP_CHANNEL_ID = 1561113450812407871
 GLOBAL_DROP_COIN_REWARDS = [50000, 75000, 100000, 125000, 150000, 200000]
 BOOST_COLOR = 0xF47FFF
 
@@ -48,6 +49,15 @@ class EventsCog(commands.Cog):
     async def on_member_join(self, member: discord.Member):
         if member.bot or not self._should_process_member_event("join", member.id):
             return
+
+        # Auto-assign the default join role
+        role = member.guild.get_role(AUTO_JOIN_ROLE_ID)
+        if role is not None:
+            try:
+                await member.add_roles(role, reason="Auto-assigned on member join")
+            except discord.HTTPException as e:
+                logger.error("Failed to auto-assign join role %s to %s: %s", AUTO_JOIN_ROLE_ID, member.id, e)
+
         channel = self.bot.get_channel(WELCOME_CHANNEL_ID)
         if not channel:
             return
@@ -61,9 +71,8 @@ class EventsCog(commands.Cog):
                 f"You are our **{member_count}** member!\n\n"
                 f"Enjoy your stay!"
             ),
-            color=0x8B0000,
+            color=0x00FFFF,
         )
-        embed.set_image(url="https://i.ibb.co/Rd2szwm/1jkdq5x.png")
         await channel.send(content=f"Welcome {member.mention}!", embed=embed)
 
     @commands.Cog.listener()

@@ -153,7 +153,7 @@ class LeaderboardView(discord.ui.View):
 
 
 # Channels where XP is NOT earned (excluded from leveling)
-EXCLUDED_CHANNEL_IDS = {1516579181033685022, 1513755454029959239}
+EXCLUDED_CHANNEL_IDS = {1516579181033685022, 1561113450812407871}
 
 # ── Cog ───────────────────────────────────────────────────────────────────────
 

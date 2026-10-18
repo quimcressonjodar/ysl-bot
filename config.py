@@ -12,9 +12,12 @@ WEEKLY_XP_REQUIREMENT = int(os.getenv("WEEKLY_XP_REQUIREMENT", str(DEFAULT_WEEKL
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 
 WELCOME_CHANNEL_ID = 1561113449721761852
-RULES_CHANNEL_ID = 1512990947187622060
-JOIN_APPLY_CHANNEL_ID = 1515467362097434715
+RULES_CHANNEL_ID = 1561113449721761856
+JOIN_APPLY_CHANNEL_ID = 1561113450812407869
 OWNER_IDS = {1436417791615045785, 941697213447421952, 1373879454077685800, 789938929151377428}
+
+# Role automatically assigned to every member who joins the server.
+AUTO_JOIN_ROLE_ID = 1561133274892599357
 
 # ── Modmail ──────────────────────────────────────────────────────────────────
 # Dedicated staff server where DMs sent to the bot get relayed as channels
@@ -36,13 +39,13 @@ XP_COOLDOWN = 60
 # Map level milestone → Discord role ID.
 # Run /createlevelroles in your server to create the roles, then fill in the IDs.
 LEVEL_ROLES: dict[int, int] = {
-    1:  1528464058284507166,
-    5:  1528464059048132619,
-    10: 1528464059635077122,
-    15: 1528464062181150821,
-    20: 1528464063707877446,
-    30: 1528464064961839114,
-    50: 1528464066367066372,
+    1:  1561285404148113450,
+    5:  1561285404940836874,
+    10: 1561285405616377897,
+    15: 1561285407994544238,
+    20: 1561285410171130047,
+    30: 1561285410590556164,
+    50: 1561285411496665109,
 }
 
 # ── Server boosts ────────────────────────────────────────────────────────────
