@@ -13,6 +13,8 @@ from utils.stocks import (
     stock_alerts_col, user_stocks_col,
 )
 from utils.stock_news import get_random_news
+from database import bot_state_col
+from datetime import datetime, timezone
 from utils.economy import get_wallet, update_wallet, get_bank, get_prestige_level
 from utils.helpers import is_admin
 
@@ -188,7 +190,10 @@ class Stocks(commands.Cog):
     async def update_stocks(self):
         try:
             news_impact = {}
-            if random.random() < 0.50:
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            state_doc = bot_state_col.find_one({"_id": "market_news"}) or {}
+            if state_doc.get("last_date") != today:
+                bot_state_col.update_one({"_id": "market_news"}, {"$set": {"last_date": today}}, upsert=True)
                 symbol, message, multiplier = get_random_news()
                 news_impact[symbol] = multiplier
 

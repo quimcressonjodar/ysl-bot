@@ -45,18 +45,33 @@ class EventsCog(commands.Cog):
         state.recent_member_events[key] = now
         return True
 
+    async def _give_join_role(self, member: discord.Member):
+        role = member.guild.get_role(AUTO_JOIN_ROLE_ID)
+        if role is None:
+            logger.error("Join role %s not found in guild %s", AUTO_JOIN_ROLE_ID, member.guild.id)
+            return
+        if role in member.roles:
+            return
+        try:
+            await member.add_roles(role, reason="Auto-assigned on member join")
+        except discord.Forbidden:
+            logger.error("Missing permission to give join role %s (needs Manage Roles and bot role above it)", AUTO_JOIN_ROLE_ID)
+        except discord.HTTPException as e:
+            logger.error("Failed to auto-assign join role %s to %s: %s", AUTO_JOIN_ROLE_ID, member.id, e)
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        if before.pending and not after.pending and not after.bot:
+            await self._give_join_role(after)
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         if member.bot or not self._should_process_member_event("join", member.id):
             return
 
-        # Auto-assign the default join role
-        role = member.guild.get_role(AUTO_JOIN_ROLE_ID)
-        if role is not None:
-            try:
-                await member.add_roles(role, reason="Auto-assigned on member join")
-            except discord.HTTPException as e:
-                logger.error("Failed to auto-assign join role %s to %s: %s", AUTO_JOIN_ROLE_ID, member.id, e)
+        # Members still in rules screening get the role in on_member_update
+        if not member.pending:
+            await self._give_join_role(member)
 
         channel = self.bot.get_channel(WELCOME_CHANNEL_ID)
         if not channel:
