@@ -52,6 +52,9 @@ class EventsCog(commands.Cog):
             return
         if role in member.roles:
             return
+        if role >= member.guild.me.top_role:
+            logger.error("Join role %s is above the bot's top role %s — move the bot role higher", role.name, member.guild.me.top_role.name)
+            return
         try:
             await member.add_roles(role, reason="Auto-assigned on member join")
         except discord.Forbidden:

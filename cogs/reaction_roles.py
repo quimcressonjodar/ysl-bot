@@ -24,6 +24,10 @@ from database import reaction_roles_col
 logger = logging.getLogger("weekly-xp-bot")
 
 
+def _norm_emoji(e: str) -> str:
+    return e.replace("\ufe0f", "").strip()
+
+
 # ── Modal ─────────────────────────────────────────────────────────────────────
 
 class ReactionRolesModal(discord.ui.Modal, title="Reaction Roles Setup"):
@@ -404,6 +408,25 @@ class ReactionRolesCog(commands.Cog):
         )
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    @app_commands.command(name="rolecheck", description="Check if the bot can give a role (Admin only)")
+    @app_commands.describe(role="Role to check")
+    @app_commands.default_permissions(administrator=True)
+    async def rolecheck(self, interaction: discord.Interaction, role: discord.Role):
+        me = interaction.guild.me
+        problems = []
+        if not me.guild_permissions.manage_roles:
+            problems.append("❌ Bot is missing **Manage Roles** permission.")
+        if role >= me.top_role:
+            problems.append(
+                f"❌ {role.mention} (position {role.position}) is **above or equal to** the bot's top role "
+                f"{me.top_role.mention} (position {me.top_role.position}).\n"
+                "Go to **Server Settings → Roles** and drag the bot's role **above** this role."
+            )
+        if role.managed:
+            problems.append("❌ This role is managed by an integration/bot and can't be assigned.")
+        msg = "\n".join(problems) or f"✅ The bot can give {role.mention}."
+        await interaction.response.send_message(msg, ephemeral=True)
+
     # ── Reaction listeners ────────────────────────────────────────────────────
 
     @commands.Cog.listener()
@@ -437,20 +460,26 @@ class ReactionRolesCog(commands.Cog):
                 return
 
         # Match emoji — handle both Unicode and custom emojis
-        emoji_str = str(payload.emoji)  # "🎟" or "<:name:id>"
+        emoji_str = _norm_emoji(str(payload.emoji))  # "🎟" or "<:name:id>"
+        emoji_name = _norm_emoji(payload.emoji.name or "")
 
         role_id: int | None = None
         for pair in doc.get("pairs", []):
-            stored = pair["emoji"].strip()
-            if stored == emoji_str or stored == payload.emoji.name:
+            stored = _norm_emoji(pair["emoji"])
+            if stored in (emoji_str, emoji_name):
                 role_id = pair["role_id"]
                 break
 
         if role_id is None:
+            logger.warning("reaction_roles: no pair matches emoji %r on message %s", str(payload.emoji), payload.message_id)
             return
 
         role = guild.get_role(role_id)
         if role is None:
+            logger.warning("reaction_roles: role %s no longer exists", role_id)
+            return
+        if role >= guild.me.top_role:
+            logger.error("reaction_roles: role %s is above the bot's top role %s — move the bot role higher", role.name, guild.me.top_role.name)
             return
 
         try:
