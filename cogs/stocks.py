@@ -10,7 +10,7 @@ from utils.stocks import (
     load_ipo_stocks, add_ipo_stock,
     add_price_alert, get_user_alerts, remove_alert_by_seq, check_price_alerts,
     add_autosell, get_user_autosells, remove_autosell_by_seq, check_autosells,
-    stock_alerts_col, user_stocks_col,
+    stock_alerts_col, user_stocks_col, _qty_from_stored,
 )
 from utils.stock_news import get_random_news
 from database import bot_state_col
@@ -740,7 +740,7 @@ class Stocks(commands.Cog):
                 delisted_price = STOCKS[worst_symbol].get("initial_price", 0)
 
             for doc in user_stocks_col.find({f"stocks.{worst_symbol}": {"$exists": True}}):
-                qty = doc.get("stocks", {}).get(worst_symbol, {}).get("quantity", 0)
+                qty = _qty_from_stored(doc.get("stocks", {}).get(worst_symbol, {}).get("quantity", 0))
                 if qty > 0:
                     holders.append((doc["_id"], qty))
 

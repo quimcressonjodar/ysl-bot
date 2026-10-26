@@ -348,7 +348,7 @@ def process_dividends():
             rate = rates[symbol]["rate"]
             # Accumulate as float first so small per-stock amounts don't get
             # truncated to 0 individually; only round once for the total.
-            user_total_dividend += current_price * data["quantity"] * rate
+            user_total_dividend += current_price * _qty_from_stored(data.get("quantity")) * rate
 
         user_total_dividend = int(user_total_dividend)
         if user_total_dividend > 0:
