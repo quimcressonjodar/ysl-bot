@@ -247,6 +247,11 @@ class EventsCog(commands.Cog):
         if isinstance(error, JailCheckError):
             return
 
+        root = getattr(error, "original", error)
+        if isinstance(root, discord.HTTPException) and root.status == 429:
+            logger.warning(f"Rate limited by Discord during {ctx.command}; skipping error reply")
+            return
+
         logger.error(f"Error in command {ctx.command}: {error}", exc_info=error)
 
         if isinstance(error, commands.MissingPermissions):
